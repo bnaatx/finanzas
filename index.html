@@ -193,13 +193,13 @@ async function cargarBlu(){
   const pedTotal=p=>pedSub(p)+(modoEnvio(p)==="contado"?(+p.envio||0):0);
   const pagoDe=p=>p.pago||(p.pagado?"pagado":"pendiente");
   const saldoP=p=>pagoDe(p)==="pagado"?0:Math.max(0,pedTotal(p)-(pagoDe(p)==="abono"?(+p.abono||0):0));
-  const ms=[];
-  rows.forEach(r=>{const x=r.data;if(!x||!x.fecha||x.fecha<desde)return;
-    if(r.coleccion==="pedidos"&&x.estado!=="perdido"){const cob=pedTotal(x)-saldoP(x);if(cob>0)ms.push({f:x.fecha,t:"Venta · "+(x.cliente||"Pedido"),s:"Pedido #"+(x.n||""),v:cob})}
-    if(r.coleccion==="inversiones"){const v=+x.valor||0;if(v>0)ms.push({f:x.fecha,t:"Compra · "+(x.descripcion||"Inversión"),s:x.categoria||"",v:-v})}});
+  const ms=[],snap={},ex=S.cfg.blu_excluir||{};
+  rows.forEach(r=>{const x=r.data;if(!x||!x.fecha||x.fecha<desde)return;const key=r.coleccion+":"+r.id,ya=+ex[key]||0;
+    if(r.coleccion==="pedidos"&&x.estado!=="perdido"){const cob=pedTotal(x)-saldoP(x);snap[key]=cob;const nuevo=cob-ya;if(nuevo>0)ms.push({f:x.fecha,t:"Venta · "+(x.cliente||"Pedido"),s:"Pedido #"+(x.n||""),v:nuevo})}
+    if(r.coleccion==="inversiones"){const v=+x.valor||0;snap[key]=-v;const nuevo=-v-ya;if(nuevo<0)ms.push({f:x.fecha,t:"Compra · "+(x.descripcion||"Inversión"),s:x.categoria||"",v:nuevo})}});
   ms.sort((a,b)=>b.f.localeCompare(a.f));
   const saldo=crece(S.cfg.blu_base,tasa,desde)+sum(ms,m=>crece(m.v,tasa,m.f));
-  S.blu={estado:"ok",saldo,movs:ms,entro:sum(ms.filter(m=>m.v>0),m=>m.v),salio:-sum(ms.filter(m=>m.v<0),m=>m.v),msg:""};
+  S.blu={estado:"ok",saldo,snap,movs:ms,entro:sum(ms.filter(m=>m.v>0),m=>m.v),salio:-sum(ms.filter(m=>m.v<0),m=>m.v),msg:""};
 }
 const saldoBlu=()=>S.blu.saldo!=null?S.blu.saldo:(S.cfg?crece(S.cfg.blu_base,S.cfg.tasa_blu,S.cfg.blu_desde):0);
 const sueldoNom=()=>S.cfg&&S.cfg.sueldo_nombre||"Sueldo BDB";
@@ -293,7 +293,8 @@ function vDetalle(k){
     else cuerpo=`<div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimos movimientos</b><span class="m">Desde el ${fechaCorta(S.cfg.blu_desde)}</span></div>${b.movs.length?b.movs.slice(0,8).map(m=>mvRow(m.t,fechaCorta(m.f)+(m.s?" · "+m.s:""),m.v)).join(""):'<div class="m" style="padding:12px 0">Todavía no hay ventas este mes en Blu Gestión. Cuando registres una y quede pagada, aparece aquí sola.</div>'}</div>
     <div class="card row" style="gap:18px"><div><div class="m">Entró este mes</div><b class="pos" style="font-size:16px">${fm(b.entro)}</b></div><div><div class="m">Salió este mes</div><b style="font-size:16px">${fm(b.salio)}</b></div></div>
     <a class="btn out" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://bnaatx.github.io/blu---gestion/" target="_blank" rel="noopener">Abrir Blu Gestión</a>
-    <button class="btn out" data-act="blurefresh">Actualizar</button>`;
+    <button class="btn out" data-act="blurefresh">Actualizar</button>
+    <button class="btn out" data-act="ajustesaldoblu">Ajustar saldo real</button>`;
     return `<div class="hero" style="background:var(--caja-blu)"><div class="o"></div>${back}<img src="${LOGOS.blu}" alt="Blu" style="height:44px;display:block;margin:2px 0 6px"><div style="font-size:12px;font-weight:600">Sincronizada con Blu Gestión · solo lectura</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoBlu(),2)}</div><div style="display:inline-block;margin-top:8px;background:rgba(255,255,255,.22);border-radius:12px;padding:4px 10px;font-size:12px;font-weight:700">Crece ${String(S.cfg.tasa_blu).replace(".",",")}% E.A.</div></div><div class="pad">${cuerpo}</div>`;
   }
   if(k==="hornea2"){
@@ -503,6 +504,15 @@ function sheetCat(id){
     if(id)s.querySelector("#cx").onclick=async()=>{if(!confirm("¿Borrar "+c.nombre+"? Los gastos que ya tiene quedan con ese nombre."))return;await sb.from("fin_cats").delete().eq("id",id);S.cats=S.cats.filter(x=>x.id!==id);closeSheet();render()};
   });
 }
+/* Ajustar el saldo de Blu: lo que ya está en Blu Gestión hasta ahora queda incluido en el saldo que escribes; solo se suma lo nuevo */
+function sheetAjusteBlu(){
+  if(S.blu.estado!=="ok"||!S.blu.snap){toast("Primero conecta y espera a que cargue Blu");return}
+  sheet(`<h3>Ajustar saldo de Blu</h3><div class="m">Escribe cuánto tienes de verdad ahora en la cajita de Blu. Las ventas y compras que ya están registradas en Blu Gestión se dan por incluidas en ese saldo, y desde aquí solo se suma lo nuevo.</div><input class="inp big" id="ab" inputmode="decimal" placeholder="$0"><button class="btn" id="abv">Guardar saldo</button>`,s=>{
+    s.querySelector("#abv").onclick=async()=>{const v=num(s.querySelector("#ab").value);if(v<0||s.querySelector("#ab").value.trim()===""){toast("Escribe el saldo");return}
+      const r=await sb.from("fin_config").update({blu_base:v,blu_desde:hoy(),blu_excluir:S.blu.snap}).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}
+      S.cfg=r.data;await cargarBlu();closeSheet();render();toast("Saldo de Blu ajustado")};
+  });
+}
 function sheetAjusteSaldo(){
   sheet(`<h3>Ajustar saldo de ${esc(sueldoNom())}</h3><div class="m">Escribe cuánto tienes de verdad ahora en la cajita. Desde ahí la app sigue sumando y restando lo que registres.</div><input class="inp big" id="as" inputmode="decimal" placeholder="$0"><button class="btn" id="asv">Guardar saldo</button>`,s=>{
     s.querySelector("#asv").onclick=async()=>{const v=num(s.querySelector("#as").value);if(v<0||s.querySelector("#as").value.trim()===""){toast("Escribe el saldo");return}
@@ -648,6 +658,7 @@ document.addEventListener("click",async e=>{
   else if(a==="aportar")sheetAporte(v);
   else if(a==="editcat")sheetCat(v||null);
   else if(a==="ajustesaldo")sheetAjusteSaldo();
+  else if(a==="ajustesaldoblu")sheetAjusteBlu();
   else if(a==="newcj")sheetCaja(v||null);
   else if(a==="excel")exportarExcel();
   else if(a==="cjmov"){const [i,sg]=v.split("|");sheetCjMov(i,sg)}
