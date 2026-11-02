@@ -14,7 +14,11 @@
 <title>Mis Finanzas</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
 <style>
-:root{--ink:#123F44;--mut:#4F7377;--bg:#FFF8F0;--tq:#8ACDCB;--tqd:#08807B;--soft:#E3F3F1;--soft2:#DDF7F5}
+:root{--ink:#123F44;--mut:#4F7377;--bg:#FFF8F0;--tq:#8ACDCB;--tqd:#08807B;--soft:#E3F3F1;--soft2:#DDF7F5;--line:#CFE6E4;--pri:var(--tq);--pri-tx:#fff;--nav-bg:#fff;--nav-tx:#000;--nav-on:#000;--num:inherit;--caja-blu:#D44B86;--caja-h2:#CA88DD;--caja-h2-tx:#fff;--caja-sueldo:#0A3C9C;--bar-hi:#F78CA8;--bar-lo:#FADADD;--m1:#8ACDCB;--m2:#FFB48C}
+:root[data-tema="azul"]{--ink:#173B64;--mut:#4A6585;--bg:#F6FAFF;--tq:#173B64;--tqd:#173B64;--soft:#E4EEFA;--soft2:#EAF2FC;--line:#C8DAF0;--pri:#FFDE70;--pri-tx:#173B64;--nav-bg:#173B64;--nav-tx:#fff;--nav-on:#FFDE70;--num:#FFDE70;--caja-h2:#A3C4EB;--caja-h2-tx:#173B64;--caja-sueldo:#173B64;--bar-hi:#FFDE70;--bar-lo:#A3C4EB;--m1:#173B64;--m2:#FFDE70}
+.btn.pri{background:var(--pri);color:var(--pri-tx)}
+:root[data-tema="azul"] .hero.h2c img{filter:brightness(0) invert(18%) sepia(40%) saturate(1500%) hue-rotate(180deg)}
+.hero.h2c{background:var(--caja-h2);color:var(--caja-h2-tx)}.hero.h2c .back{color:inherit}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,sans-serif}
 body{min-height:100vh;min-height:100dvh}
@@ -52,9 +56,9 @@ input,select{font-family:inherit;font-size:16px;color:var(--ink)}
 .fj input[type=checkbox]{width:22px;height:22px;margin:0 0 0 4px;accent-color:var(--tqd);flex:none}
 .fj.ok .tx b,.fj.ok .amt{text-decoration:line-through;opacity:.55}
 .nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 16px calc(env(safe-area-inset-bottom) + 12px);pointer-events:none}
-.nav>div{pointer-events:auto;width:100%;max-width:448px;height:66px;background:#fff;border-radius:28px;box-shadow:0 8px 24px rgba(18,63,68,.14);display:flex;align-items:center;justify-content:space-around;padding:0 6px}
-.nav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:#000;min-width:64px;padding:0}
-.nav button.on{font-weight:800}
+.nav>div{pointer-events:auto;width:100%;max-width:448px;height:66px;background:var(--nav-bg);border-radius:28px;box-shadow:0 8px 24px rgba(18,63,68,.14);display:flex;align-items:center;justify-content:space-around;padding:0 6px}
+.nav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--nav-tx);min-width:64px;padding:0}
+.nav button.on{font-weight:800;color:var(--nav-on)}
 .back{background:none;border:0;color:#fff;font-weight:600;font-size:13px;padding:0 0 6px}
 .seg{display:flex;background:rgba(255,255,255,.28);border-radius:14px;padding:3px;margin-top:12px}
 .seg button{flex:1;height:34px;border:0;border-radius:11px;background:none;color:#fff;font-weight:700;font-size:13px}
@@ -71,10 +75,10 @@ input,select{font-family:inherit;font-size:16px;color:var(--ink)}
 .sheet{background:#fff;width:100%;max-width:480px;border-radius:28px 28px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:12px}
 .sheet h3{margin:0;font-size:18px}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--mut)}
-.inp{height:48px;border:1.5px solid #CFE6E4;border-radius:14px;padding:0 14px;background:#fff;width:100%}
+.inp{height:48px;border:1.5px solid var(--line);border-radius:14px;padding:0 14px;background:#fff;width:100%}
 .big{font-size:28px;font-weight:800;text-align:center}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.cc{border:1.5px solid #CFE6E4;background:#fff;border-radius:14px;padding:8px 12px;font-size:13px;font-weight:700;color:var(--ink);display:flex;gap:6px;align-items:center}
+.cc{border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:8px 12px;font-size:13px;font-weight:700;color:var(--ink);display:flex;gap:6px;align-items:center}
 .cc.on{border-color:var(--ink);background:var(--soft)}
 .tgl{display:flex;gap:8px}.tgl button{flex:1;height:44px;border-radius:14px;border:1.5px solid var(--ink);background:#fff;font-weight:800;color:var(--ink)}
 .tgl button.on{background:var(--ink);color:#fff}
@@ -145,7 +149,7 @@ async function cargar(){
   for(const r of [cfg,cats,movs,fijos,pagos,metas,aps]) if(r.error) throw r.error;
   S.cfg=cfg.data;
   if(!S.cfg){const ins=await sb.from("fin_config").insert({user_id:u,nombre:(S.user.email||"").split("@")[0]}).select().single();if(ins.error)throw ins.error;S.cfg=ins.data}
-  S.cats=cats.data;S.movs=movs.data;S.fijos=fijos.data;S.pagos=pagos.data;S.metas=metas.data;S.aportes=aps.data;S.cajitas=cjs.error?[]:cjs.data;S.cmovs=cjm.error?[]:cjm.data;
+  aplicarTema(S.cfg.tema);S.cats=cats.data;S.movs=movs.data;S.fijos=fijos.data;S.pagos=pagos.data;S.metas=metas.data;S.aportes=aps.data;S.cajitas=cjs.error?[]:cjs.data;S.cmovs=cjm.error?[]:cjm.data;
   if(!S.cats.length){const base=[["Comida","#E91E63"],["Transporte","#A7D8DB"],["Gimnasio","#FFE08A"],["Cuidado personal","#FFD1B6"],["Suscripciones","#F78CA8"],["Uber y moto","#F4A261"],["Otros","#FADADD"]];
     const r=await sb.from("fin_cats").insert(base.map((c,i)=>({nombre:c[0],color:c[1],orden:i+1}))).select();if(!r.error)S.cats=r.data}
   S.h2=est.error?null:calcH2(est.data||[]);
@@ -197,6 +201,11 @@ async function cargarBlu(){
   S.blu={estado:"ok",saldo,movs:ms,entro:sum(ms.filter(m=>m.v>0),m=>m.v),salio:-sum(ms.filter(m=>m.v<0),m=>m.v),msg:""};
 }
 const saldoBlu=()=>S.blu.saldo!=null?S.blu.saldo:(S.cfg?crece(S.cfg.blu_base,S.cfg.tasa_blu,S.cfg.blu_desde):0);
+const sueldoNom=()=>S.cfg&&S.cfg.sueldo_nombre||"Sueldo BDB";
+function aplicarTema(t){
+  const r=document.documentElement;if(t&&t!=="turquesa")r.dataset.tema=t;else delete r.dataset.tema;
+  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==="azul"?"#173B64":"#8ACDCB";
+}
 function saldoSueldo(){
   const c=S.cfg,ts=new Date(c.sueldo_ts).getTime(),d0=dayOf(c.sueldo_ts);
   return crece(c.sueldo_base,c.tasa_sueldo,d0)+sum(S.movs.filter(m=>new Date(m.creado).getTime()>ts&&(!m.origen||m.origen==="sueldo")),m=>(m.tipo==="ingreso"?1:-1)*crece(+m.monto,c.tasa_sueldo,m.fecha))
@@ -248,9 +257,9 @@ function vInicio(){
   const ing=sum(mm.filter(m=>m.tipo==="ingreso"),m=>+m.monto),gas=sum(mm.filter(m=>m.tipo==="gasto"),m=>+m.monto);
   const [y,mo]=ym.split("-");
   const cajas=[];
-  if(S.cfg.blu_activo)cajas.push(`<button class="caja" style="background:#D44B86" data-act="det" data-v="blu"><div class="t">Blu<span>›</span></div><b>${fm(saldoBlu(),2)}</b><div class="s">${S.blu.estado==="ok"?"Sincronizada · crece "+String(S.cfg.tasa_blu).replace(".",",")+"%":"Toca para conectar"}</div></button>`);
-  cajas.push(`<button class="caja" style="background:#CA88DD" data-act="det" data-v="hornea2"><div class="t">Hornea2<span>›</span></div><b>${S.h2?fm(S.h2.total):"—"}</b><div class="s">Nu + efectivo · con Santiago</div></button>`);
-  cajas.push(`<button class="caja" style="background:#0A3C9C" data-act="det" data-v="sueldo"><div class="t">Sueldo BDB<span>›</span></div><b>${fm(saldoSueldo())}</b><div class="s">Tu plata personal</div></button>`);
+  if(S.cfg.blu_activo)cajas.push(`<button class="caja" style="background:var(--caja-blu)" data-act="det" data-v="blu"><div class="t">Blu<span>›</span></div><b>${fm(saldoBlu(),2)}</b><div class="s">${S.blu.estado==="ok"?"Sincronizada · crece "+String(S.cfg.tasa_blu).replace(".",",")+"%":"Toca para conectar"}</div></button>`);
+  cajas.push(`<button class="caja" style="background:var(--caja-h2);color:var(--caja-h2-tx)" data-act="det" data-v="hornea2"><div class="t">Hornea2<span>›</span></div><b>${S.h2?fm(S.h2.total):"—"}</b><div class="s">Nu + efectivo · con ${S.cfg.nombre==="Santiago"?"Bianca":"Santiago"}</div></button>`);
+  cajas.push(`<button class="caja" style="background:var(--caja-sueldo)" data-act="det" data-v="sueldo"><div class="t">${esc(sueldoNom())}<span>›</span></div><b>${fm(saldoSueldo())}</b><div class="s">Tu plata personal</div></button>`);
   S.cajitas.forEach(cj=>cajas.push(`<button class="caja" style="background:${esc(cj.color)}" data-act="det" data-v="cj:${cj.id}"><div class="t">${esc(cj.nombre)}<span>›</span></div><b>${fm(saldoCaja(cj))}</b><div class="s">${+cj.meta>0?"Meta "+fm(cj.meta):"Cajita"}</div></button>`));
   const tp=+S.cfg.tope_semanal||0;let topeHTML="";
   if(tp>0){const w=semanaTope(),q=tp-w.gastado,pc=Math.min(100,Math.max(0,w.gastado/tp*100)),col=w.gastado>tp?"#C0392B":(w.gastado>=tp*0.8?"#E6A100":"var(--tqd)");
@@ -260,12 +269,12 @@ function vInicio(){
   const pagado=f=>S.pagos.some(p=>p.fijo_id===f.id&&p.mes===ym);
   const hd=+hoy().slice(8);
   const filas=fj.map(f=>{const ok=pagado(f);const base=f.dia?(f.dia===hd&&!ok?"Hoy":"Día "+f.dia):(f.nota==="Fecha variable"?"Fecha variable":"Mensual");const ex=f.nota&&f.nota!=="Fecha variable"?" · "+f.nota:"";
-    return `<div class="fj ${ok?"ok":""}"><span class="chip ${FULL.includes(f.logo)?"full":""}" style="background:${esc(f.color)}">${logoHTML(f.logo)}</span><button class="tx" data-act="editfijo" data-v="${f.id}"><b>${esc(f.nombre)}</b><span class="m" ${f.dia===hd&&!ok?'style="color:#08807B;font-weight:800"':""}>${esc(base+ex)}</span></button><span class="amt">${f.moneda==="USD"?"US$"+f.monto:fm(f.monto)}</span><input type="checkbox" aria-label="Pagado" data-act="pago" data-v="${f.id}" ${ok?"checked":""}></div>`}).join("");
+    return `<div class="fj ${ok?"ok":""}"><span class="chip ${FULL.includes(f.logo)?"full":""}" style="background:${esc(f.color)}">${logoHTML(f.logo)}</span><button class="tx" data-act="editfijo" data-v="${f.id}"><b>${esc(f.nombre)}</b><span class="m" ${f.dia===hd&&!ok?'style="color:var(--tqd);font-weight:800"':""}>${esc(base+ex)}</span></button><span class="amt">${f.moneda==="USD"?"US$"+f.monto:fm(f.monto)}</span><input type="checkbox" aria-label="Pagado" data-act="pago" data-v="${f.id}" ${ok?"checked":""}></div>`}).join("");
   const npag=fj.filter(pagado).length;
   return `<div class="hero"><div class="o"></div><div style="font-size:13px;font-weight:600">${MESES[mesN-1][0].toUpperCase()+MESES[mesN-1].slice(1)} ${y}</div><div style="font-size:24px;font-weight:800;margin-top:2px">Hola, ${esc(S.cfg.nombre||"")}</div>
-  <div style="margin-top:14px;font-size:12px;font-weight:600">Disponible (sueldo)</div><div style="font-size:32px;font-weight:800;margin:2px 0 12px">${fm(saldoSueldo())}</div>
+  <div style="margin-top:14px;font-size:12px;font-weight:600">Disponible (sueldo)</div><div style="font-size:32px;font-weight:800;margin:2px 0 12px;color:var(--num)">${fm(saldoSueldo())}</div>
   <div style="display:flex;gap:30px;font-size:15px;font-weight:700"><div><div style="font-size:11px;font-weight:600">Ingresos del mes</div>${fm(ing)}</div><div><div style="font-size:11px;font-weight:600">Gastos del mes</div>${fm(gas)}</div></div></div>
-  <div class="pad"><div class="row"><button class="btn" style="flex:1" data-act="mov" data-v="ingreso">+ Ingreso</button><button class="btn out" style="flex:1" data-act="mov" data-v="gasto">– Gasto</button></div>${topeHTML}
+  <div class="pad"><div class="row"><button class="btn pri" style="flex:1" data-act="mov" data-v="ingreso">+ Ingreso</button><button class="btn out" style="flex:1" data-act="mov" data-v="gasto">– Gasto</button></div>${topeHTML}
   <div><div class="sec"><b>Cajitas</b><span class="m">Cada plata en su lugar</span></div><div class="grid3">${cajas.join("")}</div><button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="newcj" data-v="">+ Nueva cajita</button></div>
   <div><div class="sec"><b>Gastos fijos mensuales</b><span class="m">${npag} de ${fj.length} pagados</span></div><div class="card" style="padding:4px 16px">${filas||'<div class="m" style="padding:14px 0">Aún no tienes gastos fijos.</div>'}</div>
   <button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="editfijo" data-v="">+ Agregar gasto fijo</button></div></div>`;
@@ -282,13 +291,13 @@ function vDetalle(k){
     <div class="card row" style="gap:18px"><div><div class="m">Entró este mes</div><b class="pos" style="font-size:16px">${fm(b.entro)}</b></div><div><div class="m">Salió este mes</div><b style="font-size:16px">${fm(b.salio)}</b></div></div>
     <a class="btn out" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://bnaatx.github.io/blu---gestion/" target="_blank" rel="noopener">Abrir Blu Gestión</a>
     <button class="btn out" data-act="blurefresh">Actualizar</button>`;
-    return `<div class="hero" style="background:#D44B86"><div class="o"></div>${back}<img src="${LOGOS.blu}" alt="Blu" style="height:44px;display:block;margin:2px 0 6px"><div style="font-size:12px;font-weight:600">Sincronizada con Blu Gestión · solo lectura</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoBlu(),2)}</div><div style="display:inline-block;margin-top:8px;background:rgba(255,255,255,.22);border-radius:12px;padding:4px 10px;font-size:12px;font-weight:700">Crece ${String(S.cfg.tasa_blu).replace(".",",")}% E.A.</div></div><div class="pad">${cuerpo}</div>`;
+    return `<div class="hero" style="background:var(--caja-blu)"><div class="o"></div>${back}<img src="${LOGOS.blu}" alt="Blu" style="height:44px;display:block;margin:2px 0 6px"><div style="font-size:12px;font-weight:600">Sincronizada con Blu Gestión · solo lectura</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoBlu(),2)}</div><div style="display:inline-block;margin-top:8px;background:rgba(255,255,255,.22);border-radius:12px;padding:4px 10px;font-size:12px;font-weight:700">Crece ${String(S.cfg.tasa_blu).replace(".",",")}% E.A.</div></div><div class="pad">${cuerpo}</div>`;
   }
   if(k==="hornea2"){
     const h=S.h2;
-    if(!h)return `<div class="hero" style="background:#CA88DD"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Hornea2</div></div><div class="pad"><div class="card">No se pudo leer la app de Hornea2.</div></div>`;
+    if(!h)return `<div class="hero h2c"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Hornea2</div></div><div class="pad"><div class="card">No se pudo leer la app de Hornea2.</div></div>`;
     const pct=+S.cfg.hornea_pct||50;
-    return `<div class="hero" style="background:#CA88DD"><div class="o"></div>${back}<img src="${LOGOS.hornea2}" alt="Hornea2" style="height:44px;display:block;margin:2px 0 6px"><div style="font-size:12px;font-weight:600">Sincronizada con la app de Hornea2 · con Santiago</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(h.total)}</div><div style="font-size:12px;font-weight:600;margin-top:2px">Tu parte (${pct}%): ${fm(h.total*pct/100)}</div></div>
+    return `<div class="hero h2c"><div class="o"></div>${back}<img src="${LOGOS.hornea2}" alt="Hornea2" style="height:44px;display:block;margin:2px 0 6px"><div style="font-size:12px;font-weight:600">Sincronizada con la app de Hornea2 · con ${S.cfg.nombre==="Santiago"?"Bianca":"Santiago"}</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(h.total)}</div><div style="font-size:12px;font-weight:600;margin-top:2px">Tu parte (${pct}%): ${fm(h.total*pct/100)}</div></div>
     <div class="pad"><div class="row" style="align-items:stretch"><div class="card" style="flex:1;padding:14px"><div class="m">Nu · cajita</div><div style="font-size:18px;font-weight:800;margin-top:2px">${fm(h.nu)}</div><div class="m" style="margin-top:2px">Rinde ${String(h.rate).replace(".",",")}% E.A.</div></div><div class="card" style="flex:1;padding:14px"><div class="m">Efectivo</div><div style="font-size:18px;font-weight:800;margin-top:2px">${fm(h.ef)}</div><div class="m" style="margin-top:2px">Cajas fuertes</div></div></div>
     <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimas ventas</b><span class="m">Por cobrar: ${fm(h.deb)}</span></div>${h.movs.length?h.movs.map(m=>mvRow(m.c+" · "+m.l,fechaCorta(m.d)+" · "+m.q+(m.q===1?" brownie":" brownies"),m.p==="Debe"?0:m.v,m.p)).join(""):'<div class="m" style="padding:12px 0">Todavía no hay ventas en Hornea2. Cuando las anotes allá, entran aquí solas.</div>'}</div>
     <a class="btn out" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://bnaatx.github.io/hornea2-gestion/" target="_blank" rel="noopener">Abrir app de Hornea2</a></div>`;
@@ -298,12 +307,12 @@ function vDetalle(k){
     const sal=saldoCaja(cj),mv=S.cmovs.filter(x=>x.cajita_id===cj.id).slice(0,15),meta=+cj.meta||0,pc=meta>0?Math.min(100,Math.max(0,sal/meta*100)):0;
     return `<div class="hero" style="background:${esc(cj.color)}"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(cj.nombre)}</div><div style="font-size:12px;font-weight:600">Cajita de Nu · crece ${String(cj.tasa).replace(".",",")}% E.A.</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(sal)}</div>${meta>0?`<div style="background:rgba(255,255,255,.3);height:10px;border-radius:5px;margin-top:10px;overflow:hidden"><i style="display:block;height:100%;width:${pc}%;background:#fff;border-radius:5px"></i></div><div style="font-size:12px;font-weight:700;margin-top:6px">Meta ${fm(meta)}${+cj.aporte_mes>0?" · aporte sugerido "+fm(cj.aporte_mes)+" al mes":""}</div>`:""}</div>
     <div class="pad"><div class="row"><button class="btn" style="flex:1" data-act="cjmov" data-v="${cj.id}|+">+ Aportar</button><button class="btn out" style="flex:1" data-act="cjmov" data-v="${cj.id}|-">Usar plata</button></div>
-    <div class="m">Al aportar, el dinero sale de tu cajita Sueldo BDB. Al usar plata, solo baja esta cajita.</div>
+    <div class="m">Al aportar, el dinero sale de tu cajita ${esc(sueldoNom())}. Al usar plata, solo baja esta cajita.</div>
     <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${mv.length?mv.map(x=>mvRow(x.nota||(+x.monto>0?"Aporte":"Uso de la cajita"),fechaCorta(x.fecha),+x.monto,"",`<button class="x" data-act="delcm" data-v="${x.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos.</div>'}</div>
     <button class="btn out" data-act="newcj" data-v="${cj.id}">Editar cajita</button></div>`;
   }
   const mm=S.movs.slice(0,15);
-  return `<div class="hero" style="background:#0A3C9C"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Sueldo BDB</div><div style="font-size:12px;font-weight:600">Tu plata personal · crece ${String(S.cfg.tasa_sueldo).replace(".",",")}% E.A.</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoSueldo())}</div></div>
+  return `<div class="hero" style="background:var(--caja-sueldo)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(sueldoNom())}</div><div style="font-size:12px;font-weight:600">Tu plata personal · crece ${String(S.cfg.tasa_sueldo).replace(".",",")}% E.A.</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoSueldo())}</div></div>
   <div class="pad"><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimos movimientos</b></div>${mm.length?mm.map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,m.origen&&m.origen!=="sueldo"?m.origen:"",`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no has registrado movimientos.</div>'}</div>
   <button class="btn out" data-act="ajustesaldo">Ajustar saldo real</button></div>`;
 }
@@ -331,7 +340,7 @@ function sheetMov(tipo){
 }
 function sheetCjMov(cid,signo){
   const cj=S.cajitas.find(x=>x.id===cid);const ap=signo==="+";
-  sheet(`<h3>${ap?"Aportar a "+esc(cj.nombre):"Usar plata de "+esc(cj.nombre)}</h3><div class="m">${ap?"Esta plata sale de tu cajita Sueldo BDB.":"Baja solo esta cajita (por ejemplo, cuando pagas la queratina)."}</div><input class="inp big" id="cm" inputmode="decimal" placeholder="$0" value="${ap&&+cj.aporte_mes>0?Math.round(cj.aporte_mes/2):""}"><label>Nota (opcional)<input class="inp" id="cn" autocomplete="off"></label><label>Fecha<input class="inp" id="cf" type="date" value="${hoy()}"></label><button class="btn" id="cs">Guardar</button>`,s=>{
+  sheet(`<h3>${ap?"Aportar a "+esc(cj.nombre):"Usar plata de "+esc(cj.nombre)}</h3><div class="m">${ap?"Esta plata sale de tu cajita "+esc(sueldoNom())+".":"Baja solo esta cajita (por ejemplo, cuando pagas la queratina)."}</div><input class="inp big" id="cm" inputmode="decimal" placeholder="$0" value="${ap&&+cj.aporte_mes>0?Math.round(cj.aporte_mes/2):""}"><label>Nota (opcional)<input class="inp" id="cn" autocomplete="off"></label><label>Fecha<input class="inp" id="cf" type="date" value="${hoy()}"></label><button class="btn" id="cs">Guardar</button>`,s=>{
     s.querySelector("#cs").onclick=async()=>{const v=num(s.querySelector("#cm").value);if(!(v>0)){toast("Escribe el monto");return}
       const r=await sb.from("fin_cajita_movs").insert({cajita_id:cid,monto:ap?v:-v,nota:s.querySelector("#cn").value.trim(),fecha:s.querySelector("#cf").value||hoy()}).select().single();if(r.error){toast("No se guardó");return}
       S.cmovs.unshift(r.data);closeSheet();render();toast(ap?"Aporte guardado":"Listo")};
@@ -402,7 +411,7 @@ function vStats(){
   const col=n=>(S.cats.find(c=>c.nombre===n)||{color:"#C9D6D5"}).color;
   const lista=Object.entries(by).sort((x,y)=>y[1]-x[1]);
   let acc=0;const stops=lista.map(([n,v])=>{const s=acc/tot*100;acc+=v;return `${col(n)} ${s}% ${acc/tot*100}%`});
-  const donut=tot?`background:conic-gradient(${stops.join(",")})`:"background:#E3F3F1";
+  const donut=tot?`background:conic-gradient(${stops.join(",")})`:"background:var(--soft)";
   // barras
   let bk=[];
   if(S.per==="semana"){const d0=dd(r.a);for(let i=0;i<7;i++){const d=new Date(d0);d.setDate(d.getDate()+i);const k=iso(d);bk.push(["LMXJVSD"[i],sum(gs.filter(m=>m.fecha===k),m=>+m.monto)])}}
@@ -415,7 +424,7 @@ function vStats(){
   return `<div class="hero"><div class="o"></div><div style="font-size:24px;font-weight:800">Estadísticas</div><div class="row" style="margin-top:4px"><button class="x" style="color:#fff" data-act="off" data-v="-1">‹</button><div style="font-size:13px;font-weight:700;flex:1;text-align:center">${esc(r.label)}</div><button class="x" style="color:#fff" data-act="off" data-v="1">›</button></div>
   <div class="seg">${["semana","mes","año"].map(p=>`<button data-act="per" data-v="${p}" class="${S.per===p?"on":""}">${p[0].toUpperCase()+p.slice(1)}</button>`).join("")}</div></div>
   <div class="pad"><div class="card row" style="gap:16px"><div class="donut" style="${donut}"><i><span class="m">Gastaste</span><b style="font-size:16px">${fm(tot)}</b></i></div><div style="flex:1;display:flex;flex-direction:column;gap:8px">${lista.length?lista.map(([n,v])=>`<div class="row" style="gap:8px;font-size:12.5px"><span class="dot" style="background:${col(n)}"></span><span style="flex:1">${esc(n)}</span><b>${Math.round(v/tot*100)}%</b></div>`).join(""):'<span class="m">Sin gastos</span>'}</div></div>
-  <div class="card"><div class="sec"><b>Gasto por ${S.per==="semana"?"día":S.per==="mes"?"semana":"mes"}</b></div><div class="bars">${bk.map((b,i)=>`<div><span style="height:${Math.max(4,b[1]/mx*80)}px;background:${i===mxi&&b[1]>0?"#F78CA8":"#FADADD"}"></span><span class="m" style="min-height:0;width:auto;font-size:11px">${b[0]}</span></div>`).join("")}</div></div>
+  <div class="card"><div class="sec"><b>Gasto por ${S.per==="semana"?"día":S.per==="mes"?"semana":"mes"}</b></div><div class="bars">${bk.map((b,i)=>`<div><span style="height:${Math.max(4,b[1]/mx*80)}px;background:${i===mxi&&b[1]>0?"var(--bar-hi)":"var(--bar-lo)"}"></span><span class="m" style="min-height:0;width:auto;font-size:11px">${b[0]}</span></div>`).join("")}</div></div>
   <div class="note" style="border-radius:20px;padding:14px 16px">${ins}</div></div>`;
 }
 
@@ -423,7 +432,7 @@ function vStats(){
 function metaCard(m){
   const ap=S.aportes.filter(a=>a.meta_id===m.id),tot=sum(ap,a=>+a.monto),obj=+m.objetivo;
   const porU={};ap.forEach(a=>{(porU[a.user_id]=porU[a.user_id]||{n:a.nombre,v:0}).v+=+a.monto});
-  const cols=["#8ACDCB","#FFB48C"];const us=Object.entries(porU).sort(([u])=>u===S.user.id?-1:1);
+  const cols=["var(--m1)","var(--m2)"];const us=Object.entries(porU).sort(([u])=>u===S.user.id?-1:1);
   const mesesF=m.fecha?Math.max(1,Math.round(diasEntre(hoy(),m.fecha)/30.4)):0;
   const falta=Math.max(0,obj-tot);
   return `<div class="card" style="display:flex;flex-direction:column;gap:12px"><div class="row" style="justify-content:space-between;align-items:baseline"><b style="font-size:17px">${esc(m.nombre)}</b><button class="x" style="font-size:12px;font-weight:700" data-act="editmeta" data-v="${m.id}">${m.fecha?esc(MESES[dd(m.fecha).getMonth()][0].toUpperCase()+MESES[dd(m.fecha).getMonth()].slice(1)+" "+dd(m.fecha).getFullYear()):"Editar"} ✎</button></div>
@@ -476,7 +485,7 @@ function vAjustes(){
   <div class="m">Clave pública (apikey)</div><div class="pre">${esc(C.supabaseKey)}</div><button class="btn out" data-act="copy" data-v="${esc(C.supabaseKey)}">Copiar clave</button></div>
   <div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Tope semanal</b><div class="m">Lo máximo que quieres gastar de lunes a domingo, sin contar gastos fijos ni gastos especiales. Pon 0 para quitarlo.</div><label>Tope por semana $<input class="inp" id="tp" inputmode="decimal" value="${+S.cfg.tope_semanal||""}" placeholder="Ej: 50000"></label><button class="btn out" data-act="savetope">Guardar tope</button></div>
   <div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Cajitas</b><div class="m">Rendimiento anual de tus cajitas de Nu (Blu y Sueldo). Hornea2 usa el de su app.</div>
-  <div class="row"><label style="flex:1">Blu %<input class="inp" id="tb" inputmode="decimal" value="${String(S.cfg.tasa_blu).replace(".",",")}"></label><label style="flex:1">Sueldo %<input class="inp" id="ts" inputmode="decimal" value="${String(S.cfg.tasa_sueldo).replace(".",",")}"></label><label style="flex:1">Tu parte de Hornea2 %<input class="inp" id="hp" inputmode="decimal" value="${String(S.cfg.hornea_pct).replace(".",",")}"></label></div>
+  <div class="row"><label style="flex:1;${S.cfg.blu_activo?"":"display:none"}">Blu %<input class="inp" id="tb" inputmode="decimal" value="${String(S.cfg.tasa_blu).replace(".",",")}"></label><label style="flex:1">Sueldo %<input class="inp" id="ts" inputmode="decimal" value="${String(S.cfg.tasa_sueldo).replace(".",",")}"></label><label style="flex:1">Tu parte de Hornea2 %<input class="inp" id="hp" inputmode="decimal" value="${String(S.cfg.hornea_pct).replace(".",",")}"></label></div>
   <button class="btn out" data-act="savetasas">Guardar</button>
   ${S.cfg.blu_activo?`<button class="btn out" data-act="bluout">Desconectar Blu Gestión</button>`:""}</div>
   <div class="m" style="text-align:center">Sesión: ${esc(S.user.email)}</div><button class="btn out" data-act="logout">Cerrar sesión</button></div>`;
@@ -491,7 +500,7 @@ function sheetCat(id){
   });
 }
 function sheetAjusteSaldo(){
-  sheet(`<h3>Ajustar saldo de Sueldo BDB</h3><div class="m">Escribe cuánto tienes de verdad ahora en la cajita. Desde ahí la app sigue sumando y restando lo que registres.</div><input class="inp big" id="as" inputmode="decimal" placeholder="$0"><button class="btn" id="asv">Guardar saldo</button>`,s=>{
+  sheet(`<h3>Ajustar saldo de ${esc(sueldoNom())}</h3><div class="m">Escribe cuánto tienes de verdad ahora en la cajita. Desde ahí la app sigue sumando y restando lo que registres.</div><input class="inp big" id="as" inputmode="decimal" placeholder="$0"><button class="btn" id="asv">Guardar saldo</button>`,s=>{
     s.querySelector("#asv").onclick=async()=>{const v=num(s.querySelector("#as").value);if(v<0||s.querySelector("#as").value.trim()===""){toast("Escribe el saldo");return}
       const ts=new Date().toISOString();const r=await sb.from("fin_config").update({sueldo_base:v,sueldo_ts:ts}).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;closeSheet();render();toast("Saldo ajustado")};
   });
@@ -523,7 +532,7 @@ document.addEventListener("click",async e=>{
   else if(a==="bluin"){const r=await bluSb.auth.signInWithPassword({email:$("#be").value.trim(),password:$("#bp").value});if(r.error){$("#bm").textContent="Correo o contraseña incorrectos.";return}await cargarBlu();render()}
   else if(a==="blurefresh")refreshBlu();
   else if(a==="bluout"){await bluSb.auth.signOut();S.blu={estado:"login",saldo:null,movs:[],msg:""};render();toast("Blu desconectado")}
-  else if(a==="logout"){await sb.auth.signOut();await bluSb.auth.signOut();S.user=null;vLogin()}
+  else if(a==="logout"){aplicarTema();await sb.auth.signOut();await bluSb.auth.signOut();S.user=null;vLogin()}
 });
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.act==="pago")togglePago(t.dataset.v,t.checked)});
 async function refreshBlu(quiet){await cargarBlu();render();if(!quiet)toast("Blu actualizado")}
