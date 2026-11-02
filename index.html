@@ -489,6 +489,7 @@ function vAjustes(){
   <div class="row"><label style="flex:1;${S.cfg.blu_activo?"":"display:none"}">Blu %<input class="inp" id="tb" inputmode="decimal" value="${String(S.cfg.tasa_blu).replace(".",",")}"></label><label style="flex:1">Sueldo %<input class="inp" id="ts" inputmode="decimal" value="${String(S.cfg.tasa_sueldo).replace(".",",")}"></label><label style="flex:1">Tu parte de Hornea2 %<input class="inp" id="hp" inputmode="decimal" value="${String(S.cfg.hornea_pct).replace(".",",")}"></label></div>
   <button class="btn out" data-act="savetasas">Guardar</button>
   ${S.cfg.blu_activo?`<button class="btn out" data-act="bluout">Desconectar Blu Gestión</button>`:""}</div>
+  <div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Tus datos en Excel</b><div class="m">Descarga todo (movimientos, categorías por mes, fijos, cajitas y metas) en un Excel con el resumen tipo dashboard y los colores de la app.</div><button class="btn" data-act="excel">Descargar Excel</button></div>
   <div class="m" style="text-align:center">Sesión: ${esc(S.user.email)}</div><button class="btn out" data-act="logout">Cerrar sesión</button></div>`;
 }
 function sheetCat(id){
@@ -505,6 +506,127 @@ function sheetAjusteSaldo(){
     s.querySelector("#asv").onclick=async()=>{const v=num(s.querySelector("#as").value);if(v<0||s.querySelector("#as").value.trim()===""){toast("Escribe el saldo");return}
       const ts=new Date().toISOString();const r=await sb.from("fin_config").update({sueldo_base:v,sueldo_ts:ts}).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;closeSheet();render();toast("Saldo ajustado")};
   });
+}
+
+/* ---------- Exportar a Excel (con los colores de la app) ---------- */
+function cargarScript(src){return new Promise((ok,no)=>{if(window.ExcelJS)return ok();const e=document.createElement("script");e.src=src;e.onload=ok;e.onerror=()=>no(new Error("No cargó "+src));document.head.appendChild(e)})}
+async function exportarExcel(){
+  toast("Preparando tu Excel…");
+  try{await cargarScript("vendor/exceljs.min.js")}catch(_){toast("No se pudo preparar el Excel");return}
+  const cs=getComputedStyle(document.documentElement),cv=(n,d)=>((cs.getPropertyValue(n)||"").trim()||d).replace("#","").toUpperCase();
+  const TQ=cv("--tq","8ACDCB"),TQD=cv("--tqd","08807B"),INK=cv("--ink","123F44"),SOFT=cv("--soft","E3F3F1"),BG=cv("--bg","FFF8F0"),MUT=cv("--mut","4F7377");
+  const fill=h=>({type:"pattern",pattern:"solid",fgColor:{argb:"FF"+h.replace("#","").toUpperCase()}});
+  const lum=h=>{const n=parseInt(h.replace("#",""),16);return 0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255)};
+  const txOn=h=>lum(h)>165?INK:"FFFFFF";
+  const FONT="Calibri",MON='"$"#,##0';
+  const catColor=n=>{const c=S.cats.find(x=>x.nombre===n);return c?c.color.replace("#","").toUpperCase():"B8C9C8"};
+  const wb=new ExcelJS.Workbook();wb.creator="Mis Finanzas";wb.created=new Date();
+  const hoyS=hoy(),ym=mesAct(),nombre=S.cfg.nombre||"";
+  const gastos=S.movs.filter(m=>m.tipo==="gasto"),ingresos=S.movs.filter(m=>m.tipo==="ingreso");
+  const delMes=a=>a.filter(m=>ymOf(m.fecha)===ym);
+  const pctTxt=v=>(Math.round(v*1000)/10).toString().replace(".",",")+"%";
+  const bar=(ws,r,c1,c2,frac,color)=>{ws.mergeCells(r,c1,r,c2);const c=ws.getCell(r,c1);c.value="█".repeat(Math.max(frac>0?1:0,Math.round(Math.min(1,frac)*18)));c.font={name:FONT,size:11,color:{argb:"FF"+color}};c.alignment={vertical:"middle",horizontal:"left"}};
+  const head=(ws,r,labels,c0=2)=>{labels.forEach((t,i)=>{const c=ws.getCell(r,c0+i);c.value=t;c.font={name:FONT,bold:true,size:11,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD);c.alignment={vertical:"middle",horizontal:i?"center":"left"}});ws.getRow(r).height=22};
+  const sect=(ws,r,t,c1=2,c2=7)=>{ws.mergeCells(r,c1,r,c2);const c=ws.getCell(r,c1);c.value=t;c.font={name:FONT,bold:true,size:14,color:{argb:"FF"+INK}};c.border={bottom:{style:"medium",color:{argb:"FF"+TQ}}};ws.getRow(r).height=24};
+  const paint=ws=>{ws.eachRow({includeEmpty:true},(row)=>{});};
+
+  /* ===== Resumen (dashboard) ===== */
+  const ws=wb.addWorksheet("Resumen",{pageSetup:{orientation:"portrait",fitToPage:true,fitToWidth:1,fitToHeight:0},views:[{showGridLines:false}],properties:{tabColor:{argb:"FF"+TQ}}});
+  ws.columns=[{width:2},{width:19},{width:19},{width:19},{width:19},{width:19},{width:19},{width:2}];
+  for(let r=1;r<=70;r++)for(let c=1;c<=8;c++)ws.getCell(r,c).fill=fill(BG);
+  ws.mergeCells("B1:G1");ws.getCell("B1").value="Mis Finanzas"+(nombre?" · "+nombre:"");ws.getCell("B1").font={name:FONT,bold:true,size:26,color:{argb:"FFFFFFFF"}};ws.getCell("B1").fill=fill(TQ);ws.getCell("B1").alignment={vertical:"middle",horizontal:"left",indent:1};ws.getRow(1).height=48;
+  ws.mergeCells("B2:G2");const fh=new Date(hoyS+"T12:00:00");ws.getCell("B2").value="Reporte al "+fh.getDate()+" de "+MESES[fh.getMonth()]+" de "+fh.getFullYear();ws.getCell("B2").font={name:FONT,size:11,color:{argb:"FF"+MUT}};ws.getCell("B2").alignment={indent:1};
+  let r=4;sect(ws,r,"Tus cajitas");r++;
+  const cards=[];
+  if(S.cfg.blu_activo)cards.push(["Blu",saldoBlu(),"#D44B86"]);
+  cards.push(["Hornea2",S.h2?S.h2.total:0,cv("--caja-h2","CA88DD")]);
+  cards.push([typeof sueldoNom==="function"?sueldoNom():"Sueldo",saldoSueldo(),cv("--caja-sueldo","0A3C9C")]);
+  S.cajitas.forEach(cj=>cards.push([cj.nombre,saldoCaja(cj),cj.color]));
+  if(S.cfg.blu_activo)cards[0][2]=cv("--caja-blu","D44B86");
+  cards.forEach((k,i)=>{const col=2+(i%6),rr=r+Math.floor(i/6)*3,bg=k[2].replace("#","").toUpperCase();
+    const a=ws.getCell(rr,col),b=ws.getCell(rr+1,col);a.value=k[0];a.font={name:FONT,bold:true,size:11,color:{argb:"FF"+txOn(bg)}};a.fill=fill(bg);a.alignment={horizontal:"left",vertical:"middle",indent:1};
+    b.value=k[1];b.numFmt=MON;b.font={name:FONT,bold:true,size:16,color:{argb:"FF"+txOn(bg)}};b.fill=fill(bg);b.alignment={horizontal:"left",vertical:"middle",indent:1};ws.getRow(rr).height=22;ws.getRow(rr+1).height=30});
+  r+=Math.ceil(cards.length/6)*3+1;
+  sect(ws,r,"Este mes");r++;
+  const ingM=sum(delMes(ingresos),m=>+m.monto),gasM=sum(delMes(gastos),m=>+m.monto);
+  [["Ingresos",ingM,TQD],["Gastos",gasM,"C0392B"],["Balance",ingM-gasM,ingM-gasM>=0?TQD:"C0392B"]].forEach((k,i)=>{const c1=2+i*2;ws.mergeCells(r,c1,r,c1+1);ws.mergeCells(r+1,c1,r+1,c1+1);
+    const a=ws.getCell(r,c1),b=ws.getCell(r+1,c1);a.value=k[0];a.font={name:FONT,bold:true,size:11,color:{argb:"FF"+MUT}};a.fill=fill(SOFT);a.alignment={horizontal:"left",indent:1,vertical:"middle"};
+    b.value=k[1];b.numFmt=MON;b.font={name:FONT,bold:true,size:18,color:{argb:"FF"+k[2]}};b.fill=fill(SOFT);b.alignment={horizontal:"left",indent:1,vertical:"middle"};ws.getCell(r,c1+1).fill=fill(SOFT);ws.getCell(r+1,c1+1).fill=fill(SOFT);ws.getRow(r+1).height=32});
+  r+=3;
+  const tp=+S.cfg.tope_semanal||0;
+  if(tp>0){const w=semanaTope();sect(ws,r,"Esta semana (lunes a domingo)");r++;
+    ws.mergeCells(r,2,r,4);ws.getCell(r,2).value=(tp-w.gastado>=0?"Te quedan ":"Te pasaste por ")+fm(Math.abs(tp-w.gastado))+" de "+fm(tp);ws.getCell(r,2).font={name:FONT,bold:true,size:13,color:{argb:"FF"+(w.gastado>tp?"C0392B":INK)}};
+    bar(ws,r,5,7,w.gastado/tp,w.gastado>tp?"C0392B":(w.gastado>=tp*.8?"E6A100":TQD));ws.getRow(r).height=22;r+=2}
+  sect(ws,r,"En qué se te va la plata este mes");r++;head(ws,r,["Categoría","Gastado","% del mes","",""," "]);ws.mergeCells(r,5,r,7);ws.getCell(r,5).value="Peso";r++;
+  const esp=sum(delMes(gastos).filter(m=>m.especial),m=>+m.monto);const gasV=gasM-esp;const por={};delMes(gastos).filter(m=>!m.especial).forEach(m=>{por[m.cat]=(por[m.cat]||0)+(+m.monto)});
+  const filas=Object.entries(por).sort((a,b)=>b[1]-a[1]);
+  if(!filas.length){ws.mergeCells(r,2,r,7);ws.getCell(r,2).value="Aún no hay gastos este mes.";ws.getCell(r,2).font={name:FONT,italic:true,color:{argb:"FF"+MUT}};r++}
+  filas.forEach(([n,v],i)=>{const bg=i%2?BG:SOFT;for(let c=2;c<=7;c++)ws.getCell(r,c).fill=fill(bg);
+    const a=ws.getCell(r,2);a.value="● "+n;a.font={name:FONT,bold:true,size:11,color:{argb:"FF"+INK}};
+    const b=ws.getCell(r,3);b.value=v;b.numFmt=MON;b.font={name:FONT,size:11,color:{argb:"FF"+INK}};b.alignment={horizontal:"center"};
+    const d=ws.getCell(r,4);d.value=gasV?v/gasV:0;d.numFmt="0.0%";d.font={name:FONT,size:11,color:{argb:"FF"+INK}};d.alignment={horizontal:"center"};
+    bar(ws,r,5,7,gasM?v/filas[0][1]:0,catColor(n));ws.getRow(r).height=20;r++});
+  if(filas.length){const t=filas[0];ws.mergeCells(r,2,r,7);ws.getCell(r,2).value="Lo que más pesa: "+t[0]+" ("+fm(t[1])+", "+pctTxt(gasV?t[1]/gasV:0)+" de tus gastos del mes, sin contar los especiales).";ws.getCell(r,2).font={name:FONT,bold:true,size:11,color:{argb:"FF"+TQD}};ws.getCell(r,2).fill=fill(SOFT);ws.getRow(r).height=22;r++}
+  if(esp>0){ws.mergeCells(r,2,r,7);ws.getCell(r,2).value="Gastos especiales del mes (fuera del tope y de este reparto): "+fm(esp);ws.getCell(r,2).font={name:FONT,italic:true,size:11,color:{argb:"FF"+MUT}};r++}
+  r++;sect(ws,r,"Últimos 6 meses");r++;head(ws,r,["Mes","Ingresos","Gastos","Balance","",""]);ws.mergeCells(r,6,r,7);ws.getCell(r,6).value="Gastos";r++;
+  const meses=[];{const n=dd(hoyS);for(let i=5;i>=0;i--){const d=new Date(n.getFullYear(),n.getMonth()-i,1);meses.push(d.getFullYear()+"-"+pad(d.getMonth()+1))}}
+  const mx=Math.max(1,...meses.map(k=>sum(gastos.filter(m=>ymOf(m.fecha)===k),m=>+m.monto)));
+  meses.forEach((k,i)=>{const ig=sum(ingresos.filter(m=>ymOf(m.fecha)===k),m=>+m.monto),ga=sum(gastos.filter(m=>ymOf(m.fecha)===k),m=>+m.monto);const bg=i%2?BG:SOFT;for(let c=2;c<=7;c++)ws.getCell(r,c).fill=fill(bg);
+    const [yy,mm]=k.split("-");ws.getCell(r,2).value=MESES[+mm-1][0].toUpperCase()+MESES[+mm-1].slice(1)+" "+yy;ws.getCell(r,2).font={name:FONT,bold:true,color:{argb:"FF"+INK}};
+    [[3,ig],[4,ga],[5,ig-ga]].forEach(([c,v])=>{const x=ws.getCell(r,c);x.value=v;x.numFmt=MON;x.alignment={horizontal:"center"};x.font={name:FONT,color:{argb:"FF"+(c===5&&v<0?"C0392B":INK)}}});
+    bar(ws,r,6,7,ga/mx,TQD);ws.getRow(r).height=20;r++});
+  r++;sect(ws,r,"Gastos fijos de este mes");r++;head(ws,r,["Gasto","Día de cobro","Monto","Categoría","Estado",""]);r++;
+  const mesN=+ym.slice(5);
+  S.fijos.filter(f=>!f.mes||f.mes===mesN).forEach((f,i)=>{const ok=S.pagos.some(p=>p.fijo_id===f.id&&p.mes===ym);const bg=i%2?BG:SOFT;for(let c=2;c<=7;c++)ws.getCell(r,c).fill=fill(bg);
+    ws.getCell(r,2).value=f.nombre;ws.getCell(r,2).font={name:FONT,bold:true,color:{argb:"FF"+INK}};
+    const d=ws.getCell(r,3);d.value=f.dia?"Día "+f.dia:"Varía";d.alignment={horizontal:"center"};
+    const m=ws.getCell(r,4);if(f.moneda==="USD"){m.value="US$ "+f.monto}else{m.value=+f.monto;m.numFmt=MON}m.alignment={horizontal:"center"};
+    const k=ws.getCell(r,5);k.value=f.cat;k.alignment={horizontal:"center"};
+    const e=ws.getCell(r,6);e.value=ok?"✔ Pagado":"Pendiente";e.font={name:FONT,bold:true,color:{argb:"FF"+(ok?TQD:"B7791F")}};e.alignment={horizontal:"center"};ws.getRow(r).height=20;r++});
+
+  /* ===== Movimientos ===== */
+  const wm=wb.addWorksheet("Movimientos",{views:[{state:"frozen",ySplit:1,showGridLines:false}],properties:{tabColor:{argb:"FF"+TQD}}});
+  wm.columns=[{header:"Fecha",key:"f",width:13},{header:"Tipo",key:"t",width:11},{header:"Categoría",key:"c",width:22},{header:"Nota",key:"n",width:38},{header:"De dónde salió",key:"o",width:18},{header:"Especial",key:"e",width:11},{header:"Monto",key:"m",width:16}];
+  wm.getRow(1).eachCell(c=>{c.font={name:FONT,bold:true,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD);c.alignment={vertical:"middle",horizontal:"center"}});wm.getRow(1).height=24;
+  S.movs.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).forEach((m,i)=>{const row=wm.addRow({f:new Date(m.fecha+"T12:00:00"),t:m.tipo==="ingreso"?"Ingreso":"Gasto",c:m.cat,n:m.nota||"",o:!m.origen||m.origen==="sueldo"?"Cajita Sueldo":m.origen,e:m.especial?"Sí":"",m:(m.tipo==="ingreso"?1:-1)*(+m.monto)});
+    row.getCell("f").numFmt="dd/mm/yyyy";row.getCell("m").numFmt='"$"#,##0;[Red]-"$"#,##0';
+    row.eachCell(c=>{c.font={name:FONT,color:{argb:"FF"+INK}};c.fill=fill(i%2?"FFFFFF":SOFT);c.alignment={vertical:"middle",horizontal:c.col===4?"left":"center"}});
+    const cc=row.getCell("c");cc.font={name:FONT,bold:true,color:{argb:"FF"+INK}};cc.border={left:{style:"thick",color:{argb:"FF"+catColor(m.cat)}}}});
+  wm.autoFilter={from:"A1",to:"G1"};
+
+  /* ===== Por categoría y mes ===== */
+  const wc=wb.addWorksheet("Categorías por mes",{views:[{state:"frozen",ySplit:1,xSplit:1,showGridLines:false}],properties:{tabColor:{argb:"FF"+TQ}}});
+  const todos=[...new Set(gastos.map(m=>ymOf(m.fecha)))].sort();
+  wc.columns=[{header:"Categoría",width:24},...todos.map(k=>({header:MESES[+k.slice(5)-1].slice(0,3).toUpperCase()+" "+k.slice(2,4),width:14})),{header:"Total",width:16}];
+  wc.getRow(1).eachCell(c=>{c.font={name:FONT,bold:true,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD);c.alignment={horizontal:"center",vertical:"middle"}});wc.getRow(1).height=24;
+  const cats=[...new Set([...S.cats.map(c=>c.nombre),...gastos.map(m=>m.cat)])];
+  cats.forEach((n,i)=>{const vals=todos.map(k=>sum(gastos.filter(m=>m.cat===n&&ymOf(m.fecha)===k),m=>+m.monto));const tot=vals.reduce((a,b)=>a+b,0);if(!tot)return;
+    const row=wc.addRow([n,...vals.map(v=>v||null),tot]);row.eachCell((c,ci)=>{c.fill=fill(i%2?"FFFFFF":SOFT);c.font={name:FONT,bold:ci===1||ci===todos.length+2,color:{argb:"FF"+INK}};if(ci>1)c.numFmt=MON});row.getCell(1).border={left:{style:"thick",color:{argb:"FF"+catColor(n)}}}});
+  {const row=wc.addRow(["Total",...todos.map(k=>sum(gastos.filter(m=>ymOf(m.fecha)===k),m=>+m.monto)),sum(gastos,m=>+m.monto)]);row.eachCell((c,ci)=>{c.font={name:FONT,bold:true,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD);if(ci>1)c.numFmt=MON})}
+
+  /* ===== Cajitas ===== */
+  const wj=wb.addWorksheet("Cajitas",{views:[{showGridLines:false}],properties:{tabColor:{argb:"FFCA88DD"}}});
+  wj.columns=[{width:26},{width:18},{width:18},{width:14},{width:40}];
+  head(wj,1,["Cajita","Saldo","Meta","Avance","Nota"],1);
+  cards.forEach(k=>{const row=wj.addRow([k[0],k[1],"","",""]);const bg=k[2].replace("#","").toUpperCase();row.getCell(1).fill=fill(bg);row.getCell(1).font={name:FONT,bold:true,color:{argb:"FF"+txOn(bg)}};row.getCell(2).numFmt=MON;row.getCell(2).font={name:FONT,bold:true,color:{argb:"FF"+INK}};row.height=22});
+  S.cajitas.forEach(cj=>{const row=wj.getRow(2+cards.findIndex(k=>k[0]===cj.nombre));row.getCell(3).value=+cj.meta||null;row.getCell(3).numFmt=MON;if(+cj.meta>0){row.getCell(4).value=saldoCaja(cj)/cj.meta;row.getCell(4).numFmt="0%"}row.getCell(5).value=+cj.aporte_mes>0?"Aporte sugerido "+fm(cj.aporte_mes)+" al mes":""});
+  wj.addRow([]);const h2r=wj.addRow(["Movimientos de cajitas","","","",""]);h2r.getCell(1).font={name:FONT,bold:true,size:13,color:{argb:"FF"+INK}};
+  const hh=wj.addRow(["Cajita","Fecha","Monto","","Nota"]);hh.eachCell(c=>{c.font={name:FONT,bold:true,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD)});
+  S.cmovs.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).forEach((x,i)=>{const cj=S.cajitas.find(c=>c.id===x.cajita_id);const row=wj.addRow([cj?cj.nombre:"",new Date(x.fecha+"T12:00:00"),+x.monto,"",x.nota||(+x.monto>0?"Aporte":"Uso de la cajita")]);row.getCell(2).numFmt="dd/mm/yyyy";row.getCell(3).numFmt='"$"#,##0;[Red]-"$"#,##0';row.eachCell(c=>{c.fill=fill(i%2?"FFFFFF":SOFT);c.font={name:FONT,color:{argb:"FF"+INK}}})});
+
+  /* ===== Metas ===== */
+  const wt=wb.addWorksheet("Metas",{views:[{showGridLines:false}],properties:{tabColor:{argb:"FFE6A100"}}});
+  wt.columns=[{width:28},{width:16},{width:18},{width:18},{width:14},{width:14}];
+  head(wt,1,["Meta","Tipo","Objetivo","Aportado","Avance","Fecha límite"],1);
+  S.metas.forEach((m,i)=>{const ap=sum(S.aportes.filter(a=>a.meta_id===m.id),a=>+a.monto);const row=wt.addRow([m.nombre,m.tipo==="conjunta"?"Conjunta":"Personal",+m.objetivo||null,ap,+m.objetivo>0?ap/m.objetivo:null,m.fecha?new Date(m.fecha+"T12:00:00"):""]);row.getCell(3).numFmt=MON;row.getCell(4).numFmt=MON;row.getCell(5).numFmt="0.0%";row.getCell(6).numFmt="dd/mm/yyyy";row.eachCell(c=>{c.fill=fill(i%2?"FFFFFF":SOFT);c.font={name:FONT,color:{argb:"FF"+INK}}})});
+  wt.addRow([]);const ah=wt.addRow(["Aportes","Quién","Monto","Fecha","",""]);ah.eachCell(c=>{c.font={name:FONT,bold:true,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD)});
+  S.aportes.forEach((a,i)=>{const m=S.metas.find(x=>x.id===a.meta_id);const row=wt.addRow([m?m.nombre:"",a.nombre||"",+a.monto,new Date(a.fecha+"T12:00:00"),"",""]);row.getCell(3).numFmt=MON;row.getCell(4).numFmt="dd/mm/yyyy";row.eachCell(c=>{c.fill=fill(i%2?"FFFFFF":SOFT);c.font={name:FONT,color:{argb:"FF"+INK}}})});
+
+  const buf=await wb.xlsx.writeBuffer();
+  const nom="Finanzas_"+(nombre||"mis-datos").replace(/\s+/g,"_")+"_"+hoyS+".xlsx";
+  const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  try{const f=new File([blob],nom,{type:blob.type});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:nom});toast("Excel listo");return}}catch(e){if(e&&e.name==="AbortError")return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast("Excel descargado");
 }
 
 /* ---------- Eventos ---------- */
@@ -525,6 +647,7 @@ document.addEventListener("click",async e=>{
   else if(a==="editcat")sheetCat(v||null);
   else if(a==="ajustesaldo")sheetAjusteSaldo();
   else if(a==="newcj")sheetCaja(v||null);
+  else if(a==="excel")exportarExcel();
   else if(a==="cjmov"){const [i,sg]=v.split("|");sheetCjMov(i,sg)}
   else if(a==="delcm"){if(!confirm("¿Borrar este movimiento?"))return;const r=await sb.from("fin_cajita_movs").delete().eq("id",v);if(r.error){toast("No se pudo borrar");return}S.cmovs=S.cmovs.filter(x=>x.id!==v);render();toast("Borrado")}
   else if(a==="savetope"){const r=await sb.from("fin_config").update({tope_semanal:num($("#tp").value)}).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;render();toast("Tope guardado")}
