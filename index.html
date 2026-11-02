@@ -88,6 +88,12 @@ label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;
 .x{background:none;border:0;color:var(--mut);font-size:18px;padding:4px 8px}
 code{background:var(--soft);border-radius:8px;padding:2px 6px;font-size:11.5px;word-break:break-all}
 .pre{background:var(--soft);border-radius:14px;padding:10px 12px;font-size:11.5px;word-break:break-all;user-select:all}
+.tope{background:#fff;border-radius:24px;padding:14px 16px;box-shadow:0 6px 18px rgba(18,63,68,.08)}
+.tope .pb{height:12px;border-radius:6px;background:var(--soft);overflow:hidden;margin:8px 0 6px}
+.tope .pb i{display:block;height:100%;border-radius:6px}
+.mini{font-size:11px;font-weight:700;color:var(--mut)}
+.ck{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--ink)}
+.ck input{width:20px;height:20px;accent-color:var(--tqd)}
 </style>
 </head>
 <body>
@@ -114,7 +120,7 @@ const crece=(monto,tasa,desde)=>monto*Math.pow(1+(+tasa||0)/100,diasEntre(desde,
 const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const ymOf=s=>s.slice(0,7);
 
-const S={user:null,cfg:null,cats:[],movs:[],fijos:[],pagos:[],metas:[],aportes:[],h2:null,blu:{estado:"off",saldo:null,movs:[],msg:""},tab:"inicio",det:null,per:"mes",off:0};
+const S={user:null,cfg:null,cats:[],movs:[],fijos:[],pagos:[],metas:[],aportes:[],cajitas:[],cmovs:[],h2:null,blu:{estado:"off",saldo:null,movs:[],msg:""},tab:"inicio",det:null,per:"mes",off:0};
 const ICON={
  bus:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M8 20v-3M16 20v-3"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg>',
  icloud:'<svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M7 19a5 5 0 0 1-.7-9.95A6.5 6.5 0 0 1 18.8 8.6 5.2 5.2 0 0 1 18 19Z"/></svg>',
@@ -133,14 +139,14 @@ const num=v=>{const n=parseFloat(String(v).replace(/\./g,"").replace(",","."));r
 async function cargar(){
   const u=S.user.id;
   const q=t=>sb.from(t).select("*");
-  const [cfg,cats,movs,fijos,pagos,metas,aps,est]=await Promise.all([
+  const [cfg,cats,movs,fijos,pagos,metas,aps,cjs,cjm,est]=await Promise.all([
     q("fin_config").eq("user_id",u).maybeSingle(),q("fin_cats").order("orden"),q("fin_movs").order("fecha",{ascending:false}).order("creado",{ascending:false}).range(0,4999),
-    q("fin_fijos").eq("activo",true).order("orden"),q("fin_pagos"),q("fin_metas"),q("fin_aportes").order("fecha",{ascending:false}),sb.from("estado").select("dominio,j")]);
+    q("fin_fijos").eq("activo",true).order("orden"),q("fin_pagos"),q("fin_metas"),q("fin_aportes").order("fecha",{ascending:false}),q("fin_cajitas").eq("activo",true).order("orden"),q("fin_cajita_movs").order("fecha",{ascending:false}),sb.from("estado").select("dominio,j")]);
   for(const r of [cfg,cats,movs,fijos,pagos,metas,aps]) if(r.error) throw r.error;
   S.cfg=cfg.data;
   if(!S.cfg){const ins=await sb.from("fin_config").insert({user_id:u,nombre:(S.user.email||"").split("@")[0]}).select().single();if(ins.error)throw ins.error;S.cfg=ins.data}
-  S.cats=cats.data;S.movs=movs.data;S.fijos=fijos.data;S.pagos=pagos.data;S.metas=metas.data;S.aportes=aps.data;
-  if(!S.cats.length){const base=[["Comida","#E91E63"],["Transporte","#A7D8DB"],["Gimnasio","#FFE08A"],["Cuidado personal","#FFD1B6"],["Suscripciones","#F78CA8"],["Otros","#FADADD"]];
+  S.cats=cats.data;S.movs=movs.data;S.fijos=fijos.data;S.pagos=pagos.data;S.metas=metas.data;S.aportes=aps.data;S.cajitas=cjs.error?[]:cjs.data;S.cmovs=cjm.error?[]:cjm.data;
+  if(!S.cats.length){const base=[["Comida","#E91E63"],["Transporte","#A7D8DB"],["Gimnasio","#FFE08A"],["Cuidado personal","#FFD1B6"],["Suscripciones","#F78CA8"],["Uber y moto","#F4A261"],["Otros","#FADADD"]];
     const r=await sb.from("fin_cats").insert(base.map((c,i)=>({nombre:c[0],color:c[1],orden:i+1}))).select();if(!r.error)S.cats=r.data}
   S.h2=est.error?null:calcH2(est.data||[]);
 }
@@ -193,7 +199,17 @@ async function cargarBlu(){
 const saldoBlu=()=>S.blu.saldo!=null?S.blu.saldo:(S.cfg?crece(S.cfg.blu_base,S.cfg.tasa_blu,S.cfg.blu_desde):0);
 function saldoSueldo(){
   const c=S.cfg,ts=new Date(c.sueldo_ts).getTime(),d0=dayOf(c.sueldo_ts);
-  return crece(c.sueldo_base,c.tasa_sueldo,d0)+sum(S.movs.filter(m=>new Date(m.creado).getTime()>ts),m=>(m.tipo==="ingreso"?1:-1)*crece(+m.monto,c.tasa_sueldo,m.fecha));
+  return crece(c.sueldo_base,c.tasa_sueldo,d0)+sum(S.movs.filter(m=>new Date(m.creado).getTime()>ts&&(!m.origen||m.origen==="sueldo")),m=>(m.tipo==="ingreso"?1:-1)*crece(+m.monto,c.tasa_sueldo,m.fecha))
+    -sum(S.cmovs.filter(x=>+x.monto>0&&new Date(x.creado).getTime()>ts),x=>crece(+x.monto,c.tasa_sueldo,x.fecha));
+}
+/* Cajitas propias (Keratina, Mantenimiento gym...): aportes suman, usos restan, y crecen */
+const saldoCaja=cj=>sum(S.cmovs.filter(x=>x.cajita_id===cj.id),x=>crece(+x.monto,cj.tasa,x.fecha));
+/* Tope semanal: de lunes a domingo, solo gastos variables (sin fijos ni gastos especiales) */
+function semanaTope(){
+  const n=dd(hoy());const l=new Date(n);l.setDate(l.getDate()-((l.getDay()+6)%7));const a=iso(l);const e=new Date(l);e.setDate(e.getDate()+6);const b=iso(e);
+  const gastado=sum(S.movs.filter(m=>m.tipo==="gasto"&&!m.fijo_id&&!m.especial&&m.fecha>=a&&m.fecha<=b),m=>+m.monto);
+  const uber=sum(S.movs.filter(m=>m.tipo==="gasto"&&!m.fijo_id&&!m.especial&&m.cat==="Uber y moto"&&m.fecha>=a&&m.fecha<=b),m=>+m.monto);
+  return {a,b,gastado,uber};
 }
 
 /* ---------- Auth ---------- */
@@ -235,6 +251,10 @@ function vInicio(){
   if(S.cfg.blu_activo)cajas.push(`<button class="caja" style="background:#D44B86" data-act="det" data-v="blu"><div class="t">Blu<span>›</span></div><b>${fm(saldoBlu(),2)}</b><div class="s">${S.blu.estado==="ok"?"Sincronizada · crece "+String(S.cfg.tasa_blu).replace(".",",")+"%":"Toca para conectar"}</div></button>`);
   cajas.push(`<button class="caja" style="background:#CA88DD" data-act="det" data-v="hornea2"><div class="t">Hornea2<span>›</span></div><b>${S.h2?fm(S.h2.total):"—"}</b><div class="s">Nu + efectivo · con Santiago</div></button>`);
   cajas.push(`<button class="caja" style="background:#0A3C9C" data-act="det" data-v="sueldo"><div class="t">Sueldo BDB<span>›</span></div><b>${fm(saldoSueldo())}</b><div class="s">Tu plata personal</div></button>`);
+  S.cajitas.forEach(cj=>cajas.push(`<button class="caja" style="background:${esc(cj.color)}" data-act="det" data-v="cj:${cj.id}"><div class="t">${esc(cj.nombre)}<span>›</span></div><b>${fm(saldoCaja(cj))}</b><div class="s">${+cj.meta>0?"Meta "+fm(cj.meta):"Cajita"}</div></button>`));
+  const tp=+S.cfg.tope_semanal||0;let topeHTML="";
+  if(tp>0){const w=semanaTope(),q=tp-w.gastado,pc=Math.min(100,Math.max(0,w.gastado/tp*100)),col=w.gastado>tp?"#C0392B":(w.gastado>=tp*0.8?"#E6A100":"var(--tqd)");
+    topeHTML=`<div class="tope"><div class="sec" style="margin-bottom:0"><b>Esta semana</b><span class="m">Se reinicia el lunes</span></div><div class="pb"><i style="width:${pc}%;background:${col}"></i></div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:18px;color:${w.gastado>tp?"#C0392B":"inherit"}">${q>=0?"Te quedan "+fm(q):"Te pasaste por "+fm(-q)}</b><span class="m">de ${fm(tp)}</span></div>${w.uber>0?`<div class="mini" style="margin-top:6px">Uber y moto esta semana: ${fm(w.uber)}</div>`:""}</div>`}
   const mesN=+mo;
   const fj=S.fijos.filter(f=>!f.mes||f.mes===mesN);
   const pagado=f=>S.pagos.some(p=>p.fijo_id===f.id&&p.mes===ym);
@@ -245,8 +265,8 @@ function vInicio(){
   return `<div class="hero"><div class="o"></div><div style="font-size:13px;font-weight:600">${MESES[mesN-1][0].toUpperCase()+MESES[mesN-1].slice(1)} ${y}</div><div style="font-size:24px;font-weight:800;margin-top:2px">Hola, ${esc(S.cfg.nombre||"")}</div>
   <div style="margin-top:14px;font-size:12px;font-weight:600">Disponible (sueldo)</div><div style="font-size:32px;font-weight:800;margin:2px 0 12px">${fm(saldoSueldo())}</div>
   <div style="display:flex;gap:30px;font-size:15px;font-weight:700"><div><div style="font-size:11px;font-weight:600">Ingresos del mes</div>${fm(ing)}</div><div><div style="font-size:11px;font-weight:600">Gastos del mes</div>${fm(gas)}</div></div></div>
-  <div class="pad"><div class="row"><button class="btn" style="flex:1" data-act="mov" data-v="ingreso">+ Ingreso</button><button class="btn out" style="flex:1" data-act="mov" data-v="gasto">– Gasto</button></div>
-  <div><div class="sec"><b>Cajitas</b><span class="m">Cada plata en su lugar</span></div><div class="grid3">${cajas.join("")}</div></div>
+  <div class="pad"><div class="row"><button class="btn" style="flex:1" data-act="mov" data-v="ingreso">+ Ingreso</button><button class="btn out" style="flex:1" data-act="mov" data-v="gasto">– Gasto</button></div>${topeHTML}
+  <div><div class="sec"><b>Cajitas</b><span class="m">Cada plata en su lugar</span></div><div class="grid3">${cajas.join("")}</div><button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="newcj" data-v="">+ Nueva cajita</button></div>
   <div><div class="sec"><b>Gastos fijos mensuales</b><span class="m">${npag} de ${fj.length} pagados</span></div><div class="card" style="padding:4px 16px">${filas||'<div class="m" style="padding:14px 0">Aún no tienes gastos fijos.</div>'}</div>
   <button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="editfijo" data-v="">+ Agregar gasto fijo</button></div></div>`;
 }
@@ -273,9 +293,18 @@ function vDetalle(k){
     <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimas ventas</b><span class="m">Por cobrar: ${fm(h.deb)}</span></div>${h.movs.length?h.movs.map(m=>mvRow(m.c+" · "+m.l,fechaCorta(m.d)+" · "+m.q+(m.q===1?" brownie":" brownies"),m.p==="Debe"?0:m.v,m.p)).join(""):'<div class="m" style="padding:12px 0">Todavía no hay ventas en Hornea2. Cuando las anotes allá, entran aquí solas.</div>'}</div>
     <a class="btn out" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://bnaatx.github.io/hornea2-gestion/" target="_blank" rel="noopener">Abrir app de Hornea2</a></div>`;
   }
+  if(k.startsWith("cj:")){
+    const cj=S.cajitas.find(x=>x.id===k.slice(3));if(!cj)return `<div class="pad"><button class="back" data-act="back">‹ Inicio</button><div class="card">No encontré esta cajita.</div></div>`;
+    const sal=saldoCaja(cj),mv=S.cmovs.filter(x=>x.cajita_id===cj.id).slice(0,15),meta=+cj.meta||0,pc=meta>0?Math.min(100,Math.max(0,sal/meta*100)):0;
+    return `<div class="hero" style="background:${esc(cj.color)}"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(cj.nombre)}</div><div style="font-size:12px;font-weight:600">Cajita de Nu · crece ${String(cj.tasa).replace(".",",")}% E.A.</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(sal)}</div>${meta>0?`<div style="background:rgba(255,255,255,.3);height:10px;border-radius:5px;margin-top:10px;overflow:hidden"><i style="display:block;height:100%;width:${pc}%;background:#fff;border-radius:5px"></i></div><div style="font-size:12px;font-weight:700;margin-top:6px">Meta ${fm(meta)}${+cj.aporte_mes>0?" · aporte sugerido "+fm(cj.aporte_mes)+" al mes":""}</div>`:""}</div>
+    <div class="pad"><div class="row"><button class="btn" style="flex:1" data-act="cjmov" data-v="${cj.id}|+">+ Aportar</button><button class="btn out" style="flex:1" data-act="cjmov" data-v="${cj.id}|-">Usar plata</button></div>
+    <div class="m">Al aportar, el dinero sale de tu cajita Sueldo BDB. Al usar plata, solo baja esta cajita.</div>
+    <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${mv.length?mv.map(x=>mvRow(x.nota||(+x.monto>0?"Aporte":"Uso de la cajita"),fechaCorta(x.fecha),+x.monto,"",`<button class="x" data-act="delcm" data-v="${x.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos.</div>'}</div>
+    <button class="btn out" data-act="newcj" data-v="${cj.id}">Editar cajita</button></div>`;
+  }
   const mm=S.movs.slice(0,15);
   return `<div class="hero" style="background:#0A3C9C"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Sueldo BDB</div><div style="font-size:12px;font-weight:600">Tu plata personal · crece ${String(S.cfg.tasa_sueldo).replace(".",",")}% E.A.</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoSueldo())}</div></div>
-  <div class="pad"><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimos movimientos</b></div>${mm.length?mm.map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,"",`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no has registrado movimientos.</div>'}</div>
+  <div class="pad"><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimos movimientos</b></div>${mm.length?mm.map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,m.origen&&m.origen!=="sueldo"?m.origen:"",`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no has registrado movimientos.</div>'}</div>
   <button class="btn out" data-act="ajustesaldo">Ajustar saldo real</button></div>`;
 }
 
@@ -287,14 +316,35 @@ function sheetMov(tipo){
   <input class="inp big" id="mm" inputmode="decimal" placeholder="$0" autocomplete="off">
   <div class="chips" id="mc">${cs.map((c,i)=>`<button type="button" class="cc" data-c="${esc(c.nombre)}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.nombre)}</button>`).join("")}</div>
   <label>Nota (opcional)<input class="inp" id="mn" placeholder="Ej: almuerzo" autocomplete="off"></label>
+  <div><div class="mini" style="margin-bottom:6px">${tipo==="gasto"?"¿De dónde salió?":"¿A dónde entró?"}</div><div class="chips" id="mo"><button type="button" class="cc on" data-o="sueldo">Cajita Sueldo</button><button type="button" class="cc" data-o="Efectivo">Efectivo</button><button type="button" class="cc" data-o="Otra cuenta">Otra cuenta</button></div></div>
+  ${tipo==="gasto"?'<label class="ck"><input type="checkbox" id="me">Gasto especial (no cuenta para el tope semanal)</label>':""}
   <label>Fecha<input class="inp" id="mf" type="date" value="${hoy()}"></label>
   <button class="btn" id="msv">Guardar</button>`,s=>{
     s.querySelectorAll(".cc").forEach(b=>b.onclick=()=>{s.querySelectorAll(".cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");cat=b.dataset.c});
+    let org="sueldo";s.querySelectorAll("#mo .cc").forEach(b=>b.onclick=()=>{s.querySelectorAll("#mo .cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");org=b.dataset.o});
     setTimeout(()=>s.querySelector("#mm").focus(),50);
     s.querySelector("#msv").onclick=async()=>{const monto=num(s.querySelector("#mm").value);if(!(monto>0)){toast("Escribe el monto");return}
-      const row={tipo,monto,cat:cat||"Otros",nota:s.querySelector("#mn").value.trim(),fecha:s.querySelector("#mf").value||hoy()};
+      const row={tipo,monto,cat:cat||"Otros",nota:s.querySelector("#mn").value.trim(),fecha:s.querySelector("#mf").value||hoy(),origen:org,especial:tipo==="gasto"&&!!(s.querySelector("#me")&&s.querySelector("#me").checked)};
       const r=await sb.from("fin_movs").insert(row).select().single();if(r.error){toast("No se guardó: "+r.error.message);return}
       S.movs.unshift(r.data);S.movs.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.creado.localeCompare(a.creado));closeSheet();render();toast(tipo==="gasto"?"Gasto guardado":"Ingreso guardado")};
+  });
+}
+function sheetCjMov(cid,signo){
+  const cj=S.cajitas.find(x=>x.id===cid);const ap=signo==="+";
+  sheet(`<h3>${ap?"Aportar a "+esc(cj.nombre):"Usar plata de "+esc(cj.nombre)}</h3><div class="m">${ap?"Esta plata sale de tu cajita Sueldo BDB.":"Baja solo esta cajita (por ejemplo, cuando pagas la queratina)."}</div><input class="inp big" id="cm" inputmode="decimal" placeholder="$0" value="${ap&&+cj.aporte_mes>0?Math.round(cj.aporte_mes/2):""}"><label>Nota (opcional)<input class="inp" id="cn" autocomplete="off"></label><label>Fecha<input class="inp" id="cf" type="date" value="${hoy()}"></label><button class="btn" id="cs">Guardar</button>`,s=>{
+    s.querySelector("#cs").onclick=async()=>{const v=num(s.querySelector("#cm").value);if(!(v>0)){toast("Escribe el monto");return}
+      const r=await sb.from("fin_cajita_movs").insert({cajita_id:cid,monto:ap?v:-v,nota:s.querySelector("#cn").value.trim(),fecha:s.querySelector("#cf").value||hoy()}).select().single();if(r.error){toast("No se guardó");return}
+      S.cmovs.unshift(r.data);closeSheet();render();toast(ap?"Aporte guardado":"Listo")};
+  });
+}
+function sheetCaja(id){
+  const c=id?S.cajitas.find(x=>x.id===id):{nombre:"",color:"#F2704F",tasa:9.35,meta:"",aporte_mes:""};
+  sheet(`<h3>${id?"Editar cajita":"Nueva cajita"}</h3><label>Nombre<input class="inp" id="kn" value="${esc(c.nombre)}"></label><label>Color (que no se repita con otra cajita)<input class="inp" id="kc" type="color" value="${esc(c.color)}" style="padding:4px"></label>
+  <div class="row"><label style="flex:1">Meta $<input class="inp" id="km" inputmode="decimal" value="${c.meta||""}"></label><label style="flex:1">Aporte al mes $<input class="inp" id="ka" inputmode="decimal" value="${c.aporte_mes||""}"></label></div><label>Rendimiento % E.A.<input class="inp" id="kt" inputmode="decimal" value="${String(c.tasa).replace(".",",")}"></label><button class="btn" id="ks">Guardar</button>${id?'<button class="btn dng" id="kx">Quitar cajita</button>':""}`,s=>{
+    s.querySelector("#ks").onclick=async()=>{const row={nombre:s.querySelector("#kn").value.trim(),color:s.querySelector("#kc").value,meta:num(s.querySelector("#km").value),aporte_mes:num(s.querySelector("#ka").value),tasa:num(s.querySelector("#kt").value)};if(!row.nombre){toast("Falta el nombre");return}
+      const r=id?await sb.from("fin_cajitas").update(row).eq("id",id).select().single():await sb.from("fin_cajitas").insert({...row,orden:S.cajitas.length+1}).select().single();if(r.error){toast("No se guardó");return}
+      if(id)S.cajitas=S.cajitas.map(x=>x.id===id?r.data:x);else S.cajitas.push(r.data);closeSheet();render()};
+    if(id)s.querySelector("#kx").onclick=async()=>{if(!confirm("¿Quitar "+c.nombre+"? Se borran también sus movimientos."))return;await sb.from("fin_cajitas").delete().eq("id",id);S.cajitas=S.cajitas.filter(x=>x.id!==id);S.cmovs=S.cmovs.filter(x=>x.cajita_id!==id);S.det=null;closeSheet();render()};
   });
 }
 async function delMov(id){
@@ -424,6 +474,7 @@ function vAjustes(){
   <div class="m">Tu código</div><div class="pre">${esc(S.cfg.token)}</div><button class="btn out" data-act="copy" data-v="${esc(S.cfg.token)}">Copiar código</button>
   <div class="m">Dirección (URL) del atajo</div><div class="pre">${esc(url)}</div><button class="btn out" data-act="copy" data-v="${esc(url)}">Copiar dirección</button>
   <div class="m">Clave pública (apikey)</div><div class="pre">${esc(C.supabaseKey)}</div><button class="btn out" data-act="copy" data-v="${esc(C.supabaseKey)}">Copiar clave</button></div>
+  <div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Tope semanal</b><div class="m">Lo máximo que quieres gastar de lunes a domingo, sin contar gastos fijos ni gastos especiales. Pon 0 para quitarlo.</div><label>Tope por semana $<input class="inp" id="tp" inputmode="decimal" value="${+S.cfg.tope_semanal||""}" placeholder="Ej: 50000"></label><button class="btn out" data-act="savetope">Guardar tope</button></div>
   <div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Cajitas</b><div class="m">Rendimiento anual de tus cajitas de Nu (Blu y Sueldo). Hornea2 usa el de su app.</div>
   <div class="row"><label style="flex:1">Blu %<input class="inp" id="tb" inputmode="decimal" value="${String(S.cfg.tasa_blu).replace(".",",")}"></label><label style="flex:1">Sueldo %<input class="inp" id="ts" inputmode="decimal" value="${String(S.cfg.tasa_sueldo).replace(".",",")}"></label><label style="flex:1">Tu parte de Hornea2 %<input class="inp" id="hp" inputmode="decimal" value="${String(S.cfg.hornea_pct).replace(".",",")}"></label></div>
   <button class="btn out" data-act="savetasas">Guardar</button>
@@ -463,6 +514,10 @@ document.addEventListener("click",async e=>{
   else if(a==="aportar")sheetAporte(v);
   else if(a==="editcat")sheetCat(v||null);
   else if(a==="ajustesaldo")sheetAjusteSaldo();
+  else if(a==="newcj")sheetCaja(v||null);
+  else if(a==="cjmov"){const [i,sg]=v.split("|");sheetCjMov(i,sg)}
+  else if(a==="delcm"){if(!confirm("¿Borrar este movimiento?"))return;const r=await sb.from("fin_cajita_movs").delete().eq("id",v);if(r.error){toast("No se pudo borrar");return}S.cmovs=S.cmovs.filter(x=>x.id!==v);render();toast("Borrado")}
+  else if(a==="savetope"){const r=await sb.from("fin_config").update({tope_semanal:num($("#tp").value)}).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;render();toast("Tope guardado")}
   else if(a==="copy"){try{await navigator.clipboard.writeText(v);toast("Copiado")}catch(_){toast("Mantén presionado el texto para copiar")}}
   else if(a==="savetasas"){const row={tasa_blu:num($("#tb").value),tasa_sueldo:num($("#ts").value),hornea_pct:num($("#hp").value)};const r=await sb.from("fin_config").update(row).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;await cargarBlu();render();toast("Guardado")}
   else if(a==="bluin"){const r=await bluSb.auth.signInWithPassword({email:$("#be").value.trim(),password:$("#bp").value});if(r.error){$("#bm").textContent="Correo o contraseña incorrectos.";return}await cargarBlu();render()}
