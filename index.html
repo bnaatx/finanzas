@@ -209,12 +209,15 @@ function aplicarTema(t){
 }
 function saldoSueldo(){
   const c=S.cfg,ts=new Date(c.sueldo_ts).getTime(),d0=dayOf(c.sueldo_ts);
-  return crece(c.sueldo_base,c.tasa_sueldo,d0)+sum(S.movs.filter(m=>new Date(m.creado).getTime()>ts&&(!m.origen||m.origen==="sueldo")),m=>(m.tipo==="ingreso"?1:-1)*crece(+m.monto,c.tasa_sueldo,m.fecha))
+  return crece(c.sueldo_base,c.tasa_sueldo,d0)+sum(S.movs.filter(m=>new Date(m.creado).getTime()>ts&&(!m.origen||m.origen==="sueldo")&&!["efectivo","tarjeta nu"].includes(medioDe(m))),m=>(m.tipo==="ingreso"?1:-1)*crece(+m.monto,c.tasa_sueldo,m.fecha))
     -sum(S.cmovs.filter(x=>+x.monto>0&&new Date(x.creado).getTime()>ts),x=>crece(+x.monto,c.tasa_sueldo,x.fecha))
     -sum((S.tpagos||[]).filter(x=>x.origen==="sueldo"&&new Date(x.creado).getTime()>ts),x=>crece(+x.monto,c.tasa_sueldo,x.fecha));
 }
 /* Efectivo y tarjeta de crédito Nu (Abre Caminos). Los medios se comparan sin importar mayúsculas */
-const esOrg=(m,n)=>(m.origen||"").trim().toLowerCase()===n;
+/* Medios de pago: con qué se pagó (Nequi, DaviPlata, Bancolombia, Nu, Efectivo, Tarjeta Nu). Es aparte de "de qué plata salió" (origen) */
+const MEDIOS=[["Efectivo","#3E9B6F"],["Nequi","#C8147F"],["DaviPlata","#E5322D"],["Bancolombia","#3B3B40"],["Nu","#8A05BE"]];
+const medioDe=m=>{const x=(m.medio||m.origen||"").trim().toLowerCase();return ["efectivo","nequi","daviplata","bancolombia","nu","tarjeta nu"].includes(x)?x:""};
+const esOrg=(m,n)=>medioDe(m)===n;
 const movsEf=()=>{const ts=new Date(S.cfg.efectivo_ts).getTime();return S.movs.filter(m=>esOrg(m,"efectivo")&&new Date(m.creado).getTime()>ts)};
 const pagosEf=()=>{const ts=new Date(S.cfg.efectivo_ts).getTime();return (S.tpagos||[]).filter(x=>(x.origen||"").toLowerCase()==="efectivo"&&new Date(x.creado).getTime()>ts)};
 const saldoEfectivo=()=>(+S.cfg.efectivo_base||0)+sum(movsEf(),m=>(m.tipo==="ingreso"?1:-1)*+m.monto)-sum(pagosEf(),x=>+x.monto);
@@ -265,6 +268,7 @@ function render(){
   window.scrollTo(0,0);
 }
 const mesAct=()=>ymOf(hoy());
+const gridCajas=cajas=>`<div class="grid3">${cajas.map((h,i)=>{const n=cajas.length,r=n%3,k=n-i;return (r===1&&k===1)?h.replace('class="caja"','class="caja w6"'):(r===2&&k<=2)?h.replace('class="caja"','class="caja w3"'):h}).join("")}</div>`;
 function vInicio(){
   const ym=mesAct(),mm=S.movs.filter(m=>ymOf(m.fecha)===ym);
   const ing=sum(mm.filter(m=>m.tipo==="ingreso"),m=>+m.monto),gas=sum(mm.filter(m=>m.tipo==="gasto"),m=>+m.monto);
@@ -273,8 +277,9 @@ function vInicio(){
   if(S.cfg.blu_activo)cajas.push(`<button class="caja" style="background:var(--caja-blu)" data-act="det" data-v="blu"><div class="t">Blu<span>›</span></div><b>${fm(saldoBlu(),2)}</b><div class="s">${S.blu.estado==="ok"?"Sincronizada · crece "+String(S.cfg.tasa_blu).replace(".",",")+"%":"Toca para conectar"}</div></button>`);
   cajas.push(`<button class="caja" style="background:var(--caja-h2);color:var(--caja-h2-tx)" data-act="det" data-v="hornea2"><div class="t">Hornea2<span>›</span></div><b>${S.h2?fm(S.h2.total):"—"}</b><div class="s">Nu + efectivo · con ${S.cfg.nombre==="Santiago"?"Bianca":"Santiago"}</div></button>`);
   cajas.push(`<button class="caja" style="background:var(--caja-sueldo)" data-act="det" data-v="sueldo"><div class="t">${esc(sueldoNom())}<span>›</span></div><b>${fm(saldoSueldo())}</b><div class="s">Tu plata personal</div></button>`);
-  cajas.push(`<button class="caja" style="background:#3E9B6F" data-act="det" data-v="efectivo"><div class="t">Efectivo<span>›</span></div><b>${fm(saldoEfectivo())}</b><div class="s">Plata en la mano</div></button>`);
-  if(tarjetaOn()){const dj=deudaTarjeta(),cp=+S.cfg.tarjeta_cupo;cajas.push(`<button class="caja" style="background:#820AD1" data-act="det" data-v="tarjeta"><div class="t">Tarjeta Nu<span>›</span></div><b>${fm(Math.max(0,cp-dj))}</b><div class="s">Disponible · debes ${fm(dj)}</div></button>`)}
+  const medios=MEDIOS.map(([n,col])=>{const k=n.toLowerCase(),gm=sum(mm.filter(m=>m.tipo==="gasto"&&esOrg(m,k)),m=>+m.monto);
+    return `<button class="caja" style="background:${col}" data-act="det" data-v="${k==="efectivo"?"efectivo":"medio:"+n}"><div class="t">${n}<span>›</span></div><b>${fm(k==="efectivo"?saldoEfectivo():gm)}</b><div class="s">${k==="efectivo"?"Plata en la mano":"Gastado este mes"}</div></button>`});
+  const tjs=[];if(tarjetaOn()){const dj=deudaTarjeta(),cp=+S.cfg.tarjeta_cupo;tjs.push(`<button class="caja" style="background:#3B1260" data-act="det" data-v="tarjeta"><div class="t">Tarjeta Nu · Abre Caminos<span>›</span></div><b>${fm(Math.max(0,cp-dj))}</b><div class="s">Disponible · debes ${fm(dj)} · cupo ${fm(cp)}</div></button>`)}
   S.cajitas.forEach(cj=>cajas.push(`<button class="caja" style="background:${esc(cj.color)}" data-act="det" data-v="cj:${cj.id}"><div class="t">${esc(cj.nombre)}<span>›</span></div><b>${fm(saldoCaja(cj))}</b><div class="s">${+cj.meta>0?"Meta "+fm(cj.meta):"Cajita"}</div></button>`));
   const tp=+S.cfg.tope_semanal||0;let topeHTML="";
   if(tp>0){const w=semanaTope(),q=tp-w.gastado,pc=Math.min(100,Math.max(0,w.gastado/tp*100)),col=w.gastado>tp?"#C0392B":(w.gastado>=tp*0.8?"#E6A100":"var(--tqd)");
@@ -290,7 +295,9 @@ function vInicio(){
   <div style="margin-top:14px;font-size:12px;font-weight:600">Disponible (sueldo)</div><div style="font-size:32px;font-weight:800;margin:2px 0 12px;color:var(--num)">${fm(saldoSueldo())}</div>
   <div style="display:flex;gap:30px;font-size:15px;font-weight:700"><div><div style="font-size:11px;font-weight:600">Ingresos del mes</div>${fm(ing)}</div><div><div style="font-size:11px;font-weight:600">Gastos del mes</div>${fm(gas)}</div></div></div>
   <div class="pad"><div class="row"><button class="btn pri" style="flex:1" data-act="mov" data-v="ingreso">+ Ingreso</button><button class="btn out" style="flex:1" data-act="mov" data-v="gasto">– Gasto</button></div>${topeHTML}
-  <div><div class="sec"><b>Cajitas</b><span class="m">Cada plata en su lugar</span></div><div class="grid3">${cajas.map((h,i)=>{const n=cajas.length,r=n%3,k=n-i;return (r===1&&k===1)?h.replace('class="caja"','class="caja w6"'):(r===2&&k<=2)?h.replace('class="caja"','class="caja w3"'):h}).join("")}</div><button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="newcj" data-v="">+ Nueva cajita</button>${tarjetaOn()?"":'<button class="btn dash" style="width:100%;margin-top:8px;height:44px" data-act="cfgtarjeta">+ Agregar tarjeta de crédito</button>'}</div>
+  <div><div class="sec"><b>Cajitas</b><span class="m">Cada plata en su lugar</span></div>${gridCajas(cajas)}<button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="newcj" data-v="">+ Nueva cajita</button></div>
+  <div><div class="sec"><b>Medios de pago</b><span class="m">Con qué pagas</span></div>${gridCajas(medios)}</div>
+  <div><div class="sec"><b>Tarjetas de crédito</b><span class="m">Lo que debes y lo que te queda</span></div>${tjs.length?gridCajas(tjs):""}${tarjetaOn()?"":'<button class="btn dash" style="width:100%;height:44px" data-act="cfgtarjeta">+ Agregar tarjeta de crédito</button>'}</div>
   <div><div class="sec"><b>Gastos fijos mensuales</b><span class="m">${npag} de ${fj.length} pagados</span></div><div class="card" style="padding:4px 16px">${filas||'<div class="m" style="padding:14px 0">Aún no tienes gastos fijos.</div>'}</div>
   <button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="editfijo" data-v="">+ Agregar gasto fijo</button></div></div>`;
 }
@@ -325,14 +332,20 @@ function vDetalle(k){
     <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${mv.length?mv.map(x=>mvRow(x.n,fechaCorta(x.f),x.v,"",`<button class="x" data-act="${x.t==="m"?"delmov":"deltp"}" data-v="${x.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos en efectivo.</div>'}</div>
     <button class="btn out" data-act="ajustesef">Ajustar saldo real</button></div>`;
   }
+  if(k.startsWith("medio:")){
+    const n=k.slice(6),kk=n.toLowerCase(),col=(MEDIOS.find(x=>x[0]===n)||[0,"#3B3B40"])[1],ym=mesAct();
+    const lista=S.movs.filter(m=>esOrg(m,kk)),mes=lista.filter(m=>ymOf(m.fecha)===ym);
+    return `<div class="hero" style="background:${col};text-shadow:0 1px 2px rgba(0,0,0,.28)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(n)}</div><div style="font-size:12px;font-weight:600">Medio de pago · solo muestra lo que pagas por aquí</div><div style="font-size:12px;font-weight:600;margin-top:10px">Gastado este mes</div><div style="font-size:32px;font-weight:800">${fm(sum(mes.filter(m=>m.tipo==="gasto"),m=>+m.monto))}</div><div style="font-size:12px;font-weight:700;margin-top:4px">Entró este mes ${fm(sum(mes.filter(m=>m.tipo==="ingreso"),m=>+m.monto))}</div></div>
+    <div class="pad"><div class="m">Aquí no hay saldo: cada gasto baja la cajita de la que salió la plata. Este medio solo te dice por dónde pagas más.</div><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${lista.length?lista.slice(0,15).map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,"",`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos con '+esc(n)+'.</div>'}</div></div>`;
+  }
   if(k==="tarjeta"){
     if(!tarjetaOn())return `<div class="pad"><button class="back" data-act="back">‹ Inicio</button><div class="card">Aún no hay tarjeta configurada.</div><button class="btn" data-act="cfgtarjeta">Agregar tarjeta</button></div>`;
     const cp=+S.cfg.tarjeta_cupo,dj=deudaTarjeta(),dis=Math.max(0,cp-dj),pc=Math.min(100,dj/cp*100);
     const mv=movsTj().map(m=>({f:m.fecha,c:m.creado,n:m.nota||m.cat,v:-m.monto,id:m.id,t:"m"})).concat(pagosTj().map(x=>({f:x.fecha,c:x.creado,n:"Pago de la tarjeta",v:+x.monto,id:x.id,t:"p"}))).sort((a,b)=>b.f.localeCompare(a.f)||b.c.localeCompare(a.c)).slice(0,15);
     const fechas=[+S.cfg.tarjeta_corte_dia>0?"Corte día "+S.cfg.tarjeta_corte_dia:"",+S.cfg.tarjeta_pago_dia>0?"Pagas hasta el día "+S.cfg.tarjeta_pago_dia:""].filter(Boolean).join(" · ");
-    return `<div class="hero" style="background:#820AD1;text-shadow:0 1px 2px rgba(0,0,0,.28)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Tarjeta Nu · Abre Caminos</div><div style="font-size:12px;font-weight:600">Cupo ${fm(cp)} (respaldado por tu Cajita de Respaldo)${fechas?" · "+fechas:""}</div><div style="font-size:12px;font-weight:600;margin-top:10px">Disponible</div><div style="font-size:32px;font-weight:800">${fm(dis)}</div><div style="background:rgba(255,255,255,.3);height:10px;border-radius:5px;margin-top:10px;overflow:hidden"><i style="display:block;height:100%;width:${pc}%;background:#fff;border-radius:5px"></i></div><div style="font-size:12px;font-weight:700;margin-top:6px">Debes ${fm(dj)}</div></div>
+    return `<div class="hero" style="background:#3B1260;text-shadow:0 1px 2px rgba(0,0,0,.28)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Tarjeta Nu · Abre Caminos</div><div style="font-size:12px;font-weight:600">Cupo ${fm(cp)} (respaldado por tu Cajita de Respaldo)${fechas?" · "+fechas:""}</div><div style="font-size:12px;font-weight:600;margin-top:10px">Disponible</div><div style="font-size:32px;font-weight:800">${fm(dis)}</div><div style="background:rgba(255,255,255,.3);height:10px;border-radius:5px;margin-top:10px;overflow:hidden"><i style="display:block;height:100%;width:${pc}%;background:#fff;border-radius:5px"></i></div><div style="font-size:12px;font-weight:700;margin-top:6px">Debes ${fm(dj)}</div></div>
     <div class="pad"><button class="btn" data-act="pagotarjeta">Registrar pago de la tarjeta</button>
-    <div class="m">Cada gasto que registres con “Tarjeta Nu” sube la deuda y baja el disponible. Al pagarla, la deuda baja y el disponible se libera.</div>
+    <div class="m">Cada gasto que pagues con “Tarjeta Nu” sube la deuda y baja el disponible. Al pagarla, la deuda baja y el disponible se libera.</div>
     <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${mv.length?mv.map(x=>mvRow(x.n,fechaCorta(x.f),x.v,"",`<button class="x" data-act="${x.t==="m"?"delmov":"deltp"}" data-v="${x.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos con la tarjeta.</div>'}</div>
     <button class="btn out" data-act="cfgtarjeta">Ajustar cupo, deuda y fechas</button></div>`;
   }
@@ -347,7 +360,7 @@ function vDetalle(k){
   }
   const mm=S.movs.slice(0,15);
   return `<div class="hero" style="background:var(--caja-sueldo)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(sueldoNom())}</div><div style="font-size:12px;font-weight:600">Tu plata personal · crece ${String(S.cfg.tasa_sueldo).replace(".",",")}% E.A.</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoSueldo())}</div></div>
-  <div class="pad"><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimos movimientos</b></div>${mm.length?mm.map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,m.origen&&m.origen!=="sueldo"?m.origen:"",`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no has registrado movimientos.</div>'}</div>
+  <div class="pad"><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimos movimientos</b></div>${mm.length?mm.map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,(medioDe(m)?(m.medio||m.origen):(m.origen&&m.origen!=="sueldo"?m.origen:"")),`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no has registrado movimientos.</div>'}</div>
   <button class="btn out" data-act="ajustesaldo">Ajustar saldo real</button></div>`;
 }
 
@@ -359,15 +372,17 @@ function sheetMov(tipo){
   <input class="inp big" id="mm" inputmode="decimal" placeholder="$0" autocomplete="off">
   <div class="chips" id="mc">${cs.map((c,i)=>`<button type="button" class="cc" data-c="${esc(c.nombre)}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.nombre)}</button>`).join("")}</div>
   <label>Nota (opcional)<input class="inp" id="mn" placeholder="Ej: almuerzo" autocomplete="off"></label>
-  <div><div class="mini" style="margin-bottom:6px">${tipo==="gasto"?"¿De dónde salió?":"¿A dónde entró?"}</div><div class="chips" id="mo"><button type="button" class="cc on" data-o="sueldo">Cajita Sueldo</button><button type="button" class="cc" data-o="Efectivo">Efectivo</button>${tipo==="gasto"&&tarjetaOn()?'<button type="button" class="cc" data-o="Tarjeta Nu">Tarjeta Nu</button>':""}<button type="button" class="cc" data-o="Otra cuenta">Otra cuenta</button></div></div>
+  <div><div class="mini" style="margin-bottom:6px">${tipo==="gasto"?"¿De qué plata salió?":"¿A qué plata entró?"}</div><div class="chips" id="mo"><button type="button" class="cc on" data-o="sueldo">Cajita ${esc(sueldoNom())}</button><button type="button" class="cc" data-o="Blu">Blu</button><button type="button" class="cc" data-o="Otra">Otra</button></div></div>
+  <div><div class="mini" style="margin-bottom:6px">${tipo==="gasto"?"¿Con qué pagaste?":"¿Por dónde entró?"}</div><div class="chips" id="md">${MEDIOS.map(x=>`<button type="button" class="cc" data-d="${x[0]}">${x[0]}</button>`).join("")}${tipo==="gasto"&&tarjetaOn()?'<button type="button" class="cc" data-d="Tarjeta Nu">Tarjeta Nu</button>':""}</div></div>
   ${tipo==="gasto"?'<label class="ck"><input type="checkbox" id="me">Gasto especial (no cuenta para el tope semanal)</label>':""}
   <label>Fecha<input class="inp" id="mf" type="date" value="${hoy()}"></label>
   <button class="btn" id="msv">Guardar</button>`,s=>{
     s.querySelectorAll(".cc").forEach(b=>b.onclick=()=>{s.querySelectorAll(".cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");cat=b.dataset.c});
     let org="sueldo";s.querySelectorAll("#mo .cc").forEach(b=>b.onclick=()=>{s.querySelectorAll("#mo .cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");org=b.dataset.o});
+    let med=null;s.querySelectorAll("#md .cc").forEach(b=>b.onclick=()=>{const was=b.classList.contains("on");s.querySelectorAll("#md .cc").forEach(x=>x.classList.remove("on"));if(!was){b.classList.add("on");med=b.dataset.d}else med=null});
     setTimeout(()=>s.querySelector("#mm").focus(),50);
     s.querySelector("#msv").onclick=async()=>{const monto=num(s.querySelector("#mm").value);if(!(monto>0)){toast("Escribe el monto");return}
-      const row={tipo,monto,cat:cat||"Otros",nota:s.querySelector("#mn").value.trim(),fecha:s.querySelector("#mf").value||hoy(),origen:org,especial:tipo==="gasto"&&!!(s.querySelector("#me")&&s.querySelector("#me").checked)};
+      const row={tipo,monto,cat:cat||"Otros",nota:s.querySelector("#mn").value.trim(),fecha:s.querySelector("#mf").value||hoy(),origen:org,medio:med,especial:tipo==="gasto"&&!!(s.querySelector("#me")&&s.querySelector("#me").checked)};
       const r=await sb.from("fin_movs").insert(row).select().single();if(r.error){toast("No se guardó: "+r.error.message);return}
       S.movs.unshift(r.data);S.movs.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.creado.localeCompare(a.creado));closeSheet();render();toast(tipo==="gasto"?"Gasto guardado":"Ingreso guardado")};
   });
@@ -659,13 +674,13 @@ async function exportarExcel(){
 
   /* ===== Movimientos ===== */
   const wm=wb.addWorksheet("Movimientos",{views:[{state:"frozen",ySplit:1,showGridLines:false}],properties:{tabColor:{argb:"FF"+TQD}}});
-  wm.columns=[{header:"Fecha",key:"f",width:13},{header:"Tipo",key:"t",width:11},{header:"Categoría",key:"c",width:22},{header:"Nota",key:"n",width:38},{header:"De dónde salió",key:"o",width:18},{header:"Especial",key:"e",width:11},{header:"Monto",key:"m",width:16}];
+  wm.columns=[{header:"Fecha",key:"f",width:13},{header:"Tipo",key:"t",width:11},{header:"Categoría",key:"c",width:22},{header:"Nota",key:"n",width:38},{header:"De qué plata salió",key:"o",width:20},{header:"Con qué pagó",key:"d",width:16},{header:"Especial",key:"e",width:11},{header:"Monto",key:"m",width:16}];
   wm.getRow(1).eachCell(c=>{c.font={name:FONT,bold:true,color:{argb:"FFFFFFFF"}};c.fill=fill(TQD);c.alignment={vertical:"middle",horizontal:"center"}});wm.getRow(1).height=24;
-  S.movs.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).forEach((m,i)=>{const row=wm.addRow({f:new Date(m.fecha+"T12:00:00"),t:m.tipo==="ingreso"?"Ingreso":"Gasto",c:m.cat,n:m.nota||"",o:!m.origen||m.origen==="sueldo"?"Cajita Sueldo":m.origen,e:m.especial?"Sí":"",m:(m.tipo==="ingreso"?1:-1)*(+m.monto)});
+  S.movs.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).forEach((m,i)=>{const row=wm.addRow({f:new Date(m.fecha+"T12:00:00"),t:m.tipo==="ingreso"?"Ingreso":"Gasto",c:m.cat,n:m.nota||"",o:!m.origen||m.origen==="sueldo"||medioDe(m)&&!m.medio?"Cajita Sueldo":m.origen,d:m.medio||(medioDe(m)?m.origen:""),e:m.especial?"Sí":"",m:(m.tipo==="ingreso"?1:-1)*(+m.monto)});
     row.getCell("f").numFmt="dd/mm/yyyy";row.getCell("m").numFmt='"$"#,##0;[Red]-"$"#,##0';
     row.eachCell(c=>{c.font={name:FONT,color:{argb:"FF"+INK}};c.fill=fill(i%2?"FFFFFF":SOFT);c.alignment={vertical:"middle",horizontal:c.col===4?"left":"center"}});
     const cc=row.getCell("c");cc.font={name:FONT,bold:true,color:{argb:"FF"+INK}};cc.border={left:{style:"thick",color:{argb:"FF"+catColor(m.cat)}}}});
-  wm.autoFilter={from:"A1",to:"G1"};
+  wm.autoFilter={from:"A1",to:"H1"};
 
   /* ===== Por categoría y mes ===== */
   const wc=wb.addWorksheet("Categorías por mes",{views:[{state:"frozen",ySplit:1,xSplit:1,showGridLines:false}],properties:{tabColor:{argb:"FF"+TQ}}});
