@@ -144,13 +144,13 @@ const num=v=>{const n=parseFloat(String(v).replace(/\./g,"").replace(",","."));r
 async function cargar(){
   const u=S.user.id;
   const q=t=>sb.from(t).select("*");
-  const [cfg,cats,movs,fijos,pagos,metas,aps,cjs,cjm,tpg,est]=await Promise.all([
+  const [cfg,cats,movs,fijos,pagos,metas,aps,cjs,cjm,tpg,trs,est]=await Promise.all([
     q("fin_config").eq("user_id",u).maybeSingle(),q("fin_cats").order("orden"),q("fin_movs").order("fecha",{ascending:false}).order("creado",{ascending:false}).range(0,4999),
-    q("fin_fijos").eq("activo",true).order("orden"),q("fin_pagos"),q("fin_metas"),q("fin_aportes").order("fecha",{ascending:false}),q("fin_cajitas").eq("activo",true).order("orden"),q("fin_cajita_movs").order("fecha",{ascending:false}),q("fin_tarjeta_pagos").order("fecha",{ascending:false}),sb.from("estado").select("dominio,j")]);
+    q("fin_fijos").eq("activo",true).order("orden"),q("fin_pagos"),q("fin_metas"),q("fin_aportes").order("fecha",{ascending:false}),q("fin_cajitas").eq("activo",true).order("orden"),q("fin_cajita_movs").order("fecha",{ascending:false}),q("fin_tarjeta_pagos").order("fecha",{ascending:false}),q("fin_traspasos").order("fecha",{ascending:false}),sb.from("estado").select("dominio,j")]);
   for(const r of [cfg,cats,movs,fijos,pagos,metas,aps]) if(r.error) throw r.error;
   S.cfg=cfg.data;
   if(!S.cfg){const ins=await sb.from("fin_config").insert({user_id:u,nombre:(S.user.email||"").split("@")[0]}).select().single();if(ins.error)throw ins.error;S.cfg=ins.data}
-  aplicarTema(S.cfg.tema);S.cats=cats.data;S.movs=movs.data;S.fijos=fijos.data;S.pagos=pagos.data;S.metas=metas.data;S.aportes=aps.data;S.cajitas=cjs.error?[]:cjs.data;S.cmovs=cjm.error?[]:cjm.data;S.tpagos=tpg.error?[]:tpg.data;
+  aplicarTema(S.cfg.tema);S.cats=cats.data;S.movs=movs.data;S.fijos=fijos.data;S.pagos=pagos.data;S.metas=metas.data;S.aportes=aps.data;S.cajitas=cjs.error?[]:cjs.data;S.cmovs=cjm.error?[]:cjm.data;S.tpagos=tpg.error?[]:tpg.data;S.traspasos=trs.error?[]:trs.data;
   if(!S.cats.length){const base=[["Comida","#E91E63"],["Transporte","#A7D8DB"],["Gimnasio","#FFE08A"],["Cuidado personal","#FFD1B6"],["Suscripciones","#F78CA8"],["Uber y moto","#F4A261"],["Otros","#FADADD"]];
     const r=await sb.from("fin_cats").insert(base.map((c,i)=>({nombre:c[0],color:c[1],orden:i+1}))).select();if(!r.error)S.cats=r.data}
   S.h2=est.error?null:calcH2(est.data||[]);
@@ -218,9 +218,13 @@ function saldoSueldo(){
 const MEDIOS=[["Efectivo","#3E9B6F"],["Nequi","#C8147F"],["DaviPlata","#E5322D"],["Bancolombia","#3B3B40"],["Nu","#8A05BE"]];
 const medioDe=m=>{const x=(m.medio||m.origen||"").trim().toLowerCase();return ["efectivo","nequi","daviplata","bancolombia","nu","tarjeta nu"].includes(x)?x:""};
 const esOrg=(m,n)=>medioDe(m)===n;
-const movsEf=()=>{const ts=new Date(S.cfg.efectivo_ts).getTime();return S.movs.filter(m=>esOrg(m,"efectivo")&&new Date(m.creado).getTime()>ts)};
-const pagosEf=()=>{const ts=new Date(S.cfg.efectivo_ts).getTime();return (S.tpagos||[]).filter(x=>(x.origen||"").toLowerCase()==="efectivo"&&new Date(x.creado).getTime()>ts)};
-const saldoEfectivo=()=>(+S.cfg.efectivo_base||0)+sum(movsEf(),m=>(m.tipo==="ingreso"?1:-1)*+m.monto)-sum(pagosEf(),x=>+x.monto);
+/* Mi dinero: cada cuenta tiene un saldo real (lo ajustas tú) y desde ahí suma ingresos, resta gastos y pagos de la tarjeta, y mueve traspasos */
+const cuentaBase=k=>k==="efectivo"?{base:+S.cfg.efectivo_base||0,ts:S.cfg.efectivo_ts}:((S.cfg.cuentas||{})[k]||{base:0,ts:S.cfg.efectivo_ts});
+const cuentaTs=k=>new Date(cuentaBase(k).ts).getTime();
+const pagoMedio=x=>(x.medio||x.origen||"").trim().toLowerCase();
+const trMonto=(x,k)=>(x.a.toLowerCase()===k?1:0)*+x.monto-(x.de.toLowerCase()===k?1:0)*+x.monto;
+const saldoCuenta=k=>{const t=cuentaTs(k);return (+cuentaBase(k).base||0)+sum(S.movs.filter(m=>esOrg(m,k)&&new Date(m.creado).getTime()>t),m=>(m.tipo==="ingreso"?1:-1)*+m.monto)+sum((S.traspasos||[]).filter(x=>new Date(x.creado).getTime()>t),x=>trMonto(x,k))-sum((S.tpagos||[]).filter(x=>pagoMedio(x)===k&&new Date(x.creado).getTime()>t),x=>+x.monto)};
+const saldoEfectivo=()=>saldoCuenta("efectivo");
 const movsTj=()=>{const ts=new Date(S.cfg.tarjeta_ts).getTime();return S.movs.filter(m=>m.tipo==="gasto"&&esOrg(m,"tarjeta nu")&&new Date(m.creado).getTime()>ts)};
 const pagosTj=()=>{const ts=new Date(S.cfg.tarjeta_ts).getTime();return (S.tpagos||[]).filter(x=>new Date(x.creado).getTime()>ts)};
 const deudaTarjeta=()=>Math.max(0,(+S.cfg.tarjeta_deuda_base||0)+sum(movsTj(),m=>+m.monto)-sum(pagosTj(),x=>+x.monto));
@@ -278,7 +282,8 @@ function vInicio(){
   cajas.push(`<button class="caja" style="background:var(--caja-h2);color:var(--caja-h2-tx)" data-act="det" data-v="hornea2"><div class="t">Hornea2<span>›</span></div><b>${S.h2?fm(S.h2.total):"—"}</b><div class="s">Nu + efectivo · con ${S.cfg.nombre==="Santiago"?"Bianca":"Santiago"}</div></button>`);
   cajas.push(`<button class="caja" style="background:var(--caja-sueldo)" data-act="det" data-v="sueldo"><div class="t">${esc(sueldoNom())}<span>›</span></div><b>${fm(saldoSueldo())}</b><div class="s">Tu plata personal</div></button>`);
   const medios=MEDIOS.map(([n,col])=>{const k=n.toLowerCase(),gm=sum(mm.filter(m=>m.tipo==="gasto"&&esOrg(m,k)),m=>+m.monto);
-    return `<button class="caja" style="background:${col}" data-act="det" data-v="${k==="efectivo"?"efectivo":"medio:"+n}"><div class="t">${n}<span>›</span></div><b>${fm(k==="efectivo"?saldoEfectivo():gm)}</b><div class="s">${k==="efectivo"?"Plata en la mano":"Gastado este mes"}</div></button>`});
+    return `<button class="caja" style="background:${col}" data-act="det" data-v="cuenta:${n}"><div class="t">${n}<span>›</span></div><b>${fm(saldoCuenta(k))}</b><div class="s">${k==="nu"?"Incluye tus cajitas · ":""}Gastaste ${fm(gm)} este mes</div></button>`});
+  const totalDinero=sum(MEDIOS,x=>saldoCuenta(x[0].toLowerCase()));
   const tjs=[];if(tarjetaOn()){const dj=deudaTarjeta(),cp=+S.cfg.tarjeta_cupo;tjs.push(`<button class="caja" style="background:#3B1260" data-act="det" data-v="tarjeta"><div class="t">Tarjeta Nu · Abre Caminos<span>›</span></div><b>${fm(Math.max(0,cp-dj))}</b><div class="s">Disponible · debes ${fm(dj)} · cupo ${fm(cp)}</div></button>`)}
   S.cajitas.forEach(cj=>cajas.push(`<button class="caja" style="background:${esc(cj.color)}" data-act="det" data-v="cj:${cj.id}"><div class="t">${esc(cj.nombre)}<span>›</span></div><b>${fm(saldoCaja(cj))}</b><div class="s">${+cj.meta>0?"Meta "+fm(cj.meta):"Cajita"}</div></button>`));
   const tp=+S.cfg.tope_semanal||0;let topeHTML="";
@@ -296,7 +301,7 @@ function vInicio(){
   <div style="display:flex;gap:30px;font-size:15px;font-weight:700"><div><div style="font-size:11px;font-weight:600">Ingresos del mes</div>${fm(ing)}</div><div><div style="font-size:11px;font-weight:600">Gastos del mes</div>${fm(gas)}</div></div></div>
   <div class="pad"><div class="row"><button class="btn pri" style="flex:1" data-act="mov" data-v="ingreso">+ Ingreso</button><button class="btn out" style="flex:1" data-act="mov" data-v="gasto">– Gasto</button></div>${topeHTML}
   <div><div class="sec"><b>Cajitas</b><span class="m">Cada plata en su lugar</span></div>${gridCajas(cajas)}<button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="newcj" data-v="">+ Nueva cajita</button></div>
-  <div><div class="sec"><b>Medios de pago</b><span class="m">Con qué pagas</span></div>${gridCajas(medios)}</div>
+  <div><div class="sec"><b>Mi dinero</b><span class="m">Total ${fm(totalDinero)}</span></div>${gridCajas(medios)}<button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="traspaso" data-v="">Mover plata entre cuentas</button></div>
   <div><div class="sec"><b>Tarjetas de crédito</b><span class="m">Lo que debes y lo que te queda</span></div>${tjs.length?gridCajas(tjs):""}${tarjetaOn()?"":'<button class="btn dash" style="width:100%;height:44px" data-act="cfgtarjeta">+ Agregar tarjeta de crédito</button>'}</div>
   <div><div class="sec"><b>Gastos fijos mensuales</b><span class="m">${npag} de ${fj.length} pagados</span></div><div class="card" style="padding:4px 16px">${filas||'<div class="m" style="padding:14px 0">Aún no tienes gastos fijos.</div>'}</div>
   <button class="btn dash" style="width:100%;margin-top:10px;height:44px" data-act="editfijo" data-v="">+ Agregar gasto fijo</button></div></div>`;
@@ -325,18 +330,17 @@ function vDetalle(k){
     <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Últimas ventas</b><span class="m">Por cobrar: ${fm(h.deb)}</span></div>${h.movs.length?h.movs.map(m=>mvRow(m.c+" · "+m.l,fechaCorta(m.d)+" · "+m.q+(m.q===1?" brownie":" brownies"),m.p==="Debe"?0:m.v,m.p)).join(""):'<div class="m" style="padding:12px 0">Todavía no hay ventas en Hornea2. Cuando las anotes allá, entran aquí solas.</div>'}</div>
     <a class="btn out" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://bnaatx.github.io/hornea2-gestion/" target="_blank" rel="noopener">Abrir app de Hornea2</a></div>`;
   }
-  if(k==="efectivo"){
-    const mv=movsEf().map(m=>({f:m.fecha,c:m.creado,n:m.nota||m.cat,v:(m.tipo==="ingreso"?1:-1)*+m.monto,id:m.id,t:"m"})).concat(pagosEf().map(x=>({f:x.fecha,c:x.creado,n:"Pago de tarjeta Nu",v:-x.monto,id:x.id,t:"p"}))).sort((a,b)=>b.f.localeCompare(a.f)||b.c.localeCompare(a.c)).slice(0,15);
-    return `<div class="hero" style="background:#3E9B6F;text-shadow:0 1px 2px rgba(0,0,0,.28)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">Efectivo</div><div style="font-size:12px;font-weight:600">Plata en la mano · no rinde</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoEfectivo())}</div></div>
-    <div class="pad"><div class="m">Aquí baja lo que registres como gasto con “Efectivo” y sube lo que registres como ingreso en efectivo. Si sacas o guardas billetes, usa “Ajustar saldo real”.</div>
-    <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${mv.length?mv.map(x=>mvRow(x.n,fechaCorta(x.f),x.v,"",`<button class="x" data-act="${x.t==="m"?"delmov":"deltp"}" data-v="${x.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos en efectivo.</div>'}</div>
-    <button class="btn out" data-act="ajustesef">Ajustar saldo real</button></div>`;
-  }
-  if(k.startsWith("medio:")){
-    const n=k.slice(6),kk=n.toLowerCase(),col=(MEDIOS.find(x=>x[0]===n)||[0,"#3B3B40"])[1],ym=mesAct();
-    const lista=S.movs.filter(m=>esOrg(m,kk)),mes=lista.filter(m=>ymOf(m.fecha)===ym);
-    return `<div class="hero" style="background:${col};text-shadow:0 1px 2px rgba(0,0,0,.28)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(n)}</div><div style="font-size:12px;font-weight:600">Medio de pago · solo muestra lo que pagas por aquí</div><div style="font-size:12px;font-weight:600;margin-top:10px">Gastado este mes</div><div style="font-size:32px;font-weight:800">${fm(sum(mes.filter(m=>m.tipo==="gasto"),m=>+m.monto))}</div><div style="font-size:12px;font-weight:700;margin-top:4px">Entró este mes ${fm(sum(mes.filter(m=>m.tipo==="ingreso"),m=>+m.monto))}</div></div>
-    <div class="pad"><div class="m">Aquí no hay saldo: cada gasto baja la cajita de la que salió la plata. Este medio solo te dice por dónde pagas más.</div><div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${lista.length?lista.slice(0,15).map(m=>mvRow(m.nota||m.cat,fechaCorta(m.fecha)+" · "+m.cat,(m.tipo==="ingreso"?1:-1)*m.monto,"",`<button class="x" data-act="delmov" data-v="${m.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos con '+esc(n)+'.</div>'}</div></div>`;
+  if(k.startsWith("cuenta:")){
+    const n=k.slice(7),kk=n.toLowerCase(),col=(MEDIOS.find(x=>x[0]===n)||[0,"#3B3B40"])[1],t=cuentaTs(kk),ym=mesAct();
+    const mv=S.movs.filter(m=>esOrg(m,kk)&&new Date(m.creado).getTime()>t).map(m=>({f:m.fecha,c:m.creado,n:m.nota||m.cat,v:(m.tipo==="ingreso"?1:-1)*+m.monto,id:m.id,a:"delmov"}))
+      .concat((S.traspasos||[]).filter(x=>(x.de.toLowerCase()===kk||x.a.toLowerCase()===kk)&&new Date(x.creado).getTime()>t).map(x=>({f:x.fecha,c:x.creado,n:x.a.toLowerCase()===kk?"Traspaso desde "+x.de:"Traspaso a "+x.a,v:trMonto(x,kk),id:x.id,a:"deltr"})))
+      .concat((S.tpagos||[]).filter(x=>pagoMedio(x)===kk&&new Date(x.creado).getTime()>t).map(x=>({f:x.fecha,c:x.creado,n:"Pago de la tarjeta",v:-x.monto,id:x.id,a:"deltp"})))
+      .sort((a,b)=>b.f.localeCompare(a.f)||b.c.localeCompare(a.c)).slice(0,15);
+    const gm=sum(S.movs.filter(m=>m.tipo==="gasto"&&esOrg(m,kk)&&ymOf(m.fecha)===ym),m=>+m.monto);
+    return `<div class="hero" style="background:${col};text-shadow:0 1px 2px rgba(0,0,0,.28)"><div class="o"></div>${back}<div style="font-size:22px;font-weight:800">${esc(n)}</div><div style="font-size:12px;font-weight:600">${kk==="efectivo"?"Plata en la mano · no rinde":kk==="nu"?"Tu cuenta de Nu, con todas tus cajitas adentro":"Tu plata en "+esc(n)}</div><div style="font-size:32px;font-weight:800;margin-top:10px">${fm(saldoCuenta(kk))}</div><div style="font-size:12px;font-weight:700;margin-top:4px">Gastaste ${fm(gm)} este mes</div></div>
+    <div class="pad"><div class="row"><button class="btn" style="flex:1" data-act="traspaso" data-v="${n}">Mover plata</button><button class="btn out" style="flex:1" data-act="ajustecuenta" data-v="${n}">Ajustar saldo real</button></div>
+    <div class="m">El saldo baja con lo que pagues por aquí y sube con los ingresos y traspasos que registres.</div>
+    <div class="card" style="padding:12px 16px"><div class="sec" style="margin-bottom:6px"><b>Movimientos</b></div>${mv.length?mv.map(x=>mvRow(x.n,fechaCorta(x.f),x.v,"",`<button class="x" data-act="${x.a}" data-v="${x.id}" aria-label="Borrar">×</button>`)).join(""):'<div class="m" style="padding:12px 0">Aún no hay movimientos aquí desde que ajustaste el saldo.</div>'}</div></div>`;
   }
   if(k==="tarjeta"){
     if(!tarjetaOn())return `<div class="pad"><button class="back" data-act="back">‹ Inicio</button><div class="card">Aún no hay tarjeta configurada.</div><button class="btn" data-act="cfgtarjeta">Agregar tarjeta</button></div>`;
@@ -558,10 +562,26 @@ function sheetAjusteBlu(){
       S.cfg=r.data;await cargarBlu();closeSheet();render();toast("Saldo de Blu ajustado")};
   });
 }
-function sheetAjusteEf(){
-  sheet(`<h3>Ajustar efectivo</h3><div class="m">Escribe cuánta plata en efectivo tienes de verdad ahora. Desde ahí la app sigue sumando y restando lo que registres con “Efectivo”.</div><input class="inp big" id="ae" inputmode="decimal" placeholder="$0"><button class="btn" id="aev">Guardar</button>`,s=>{
+function sheetAjusteCuenta(n){
+  const k=n.toLowerCase();
+  sheet(`<h3>Ajustar ${esc(n)}</h3><div class="m">Escribe cuánta plata tienes de verdad ahora en ${esc(n)}. Desde ahí la app suma y resta lo que registres.</div><input class="inp big" id="ae" inputmode="decimal" placeholder="$0" value="${Math.round(saldoCuenta(k))||""}"><button class="btn" id="aev">Guardar</button>`,s=>{
     s.querySelector("#aev").onclick=async()=>{const v=num(s.querySelector("#ae").value);if(v<0||s.querySelector("#ae").value.trim()===""){toast("Escribe el monto");return}
-      const r=await sb.from("fin_config").update({efectivo_base:v,efectivo_ts:new Date().toISOString()}).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;closeSheet();render();toast("Efectivo ajustado")};
+      const ts=new Date().toISOString();
+      const row=k==="efectivo"?{efectivo_base:v,efectivo_ts:ts}:{cuentas:{...(S.cfg.cuentas||{}),[k]:{base:v,ts}}};
+      const r=await sb.from("fin_config").update(row).eq("user_id",S.user.id).select().single();if(r.error){toast("No se guardó");return}S.cfg=r.data;closeSheet();render();toast(n+" ajustado")};
+  });
+}
+function sheetTraspaso(de){
+  let d=de||null,a=null;const chips=id=>MEDIOS.map(x=>`<button type="button" class="cc${id==="td"&&x[0]===d?" on":""}" data-c="${x[0]}">${x[0]}</button>`).join("");
+  sheet(`<h3>Mover plata entre cuentas</h3><div class="m">Para cuando pasas plata de una cuenta a otra, por ejemplo de Nu a Nequi. No cuenta como gasto.</div><input class="inp big" id="tm" inputmode="decimal" placeholder="$0">
+  <div><div class="mini" style="margin-bottom:6px">Sale de</div><div class="chips" id="td">${chips("td")}</div></div>
+  <div><div class="mini" style="margin-bottom:6px">Entra a</div><div class="chips" id="ta">${chips("ta")}</div></div>
+  <label>Fecha<input class="inp" id="tf" type="date" value="${hoy()}"></label><button class="btn" id="tv">Guardar</button>`,s=>{
+    const pick=(id,set)=>s.querySelectorAll("#"+id+" .cc").forEach(b=>b.onclick=()=>{s.querySelectorAll("#"+id+" .cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");set(b.dataset.c)});
+    pick("td",v=>d=v);pick("ta",v=>a=v);
+    s.querySelector("#tv").onclick=async()=>{const v=num(s.querySelector("#tm").value);if(!(v>0)){toast("Escribe el monto");return}if(!d||!a){toast("Elige de dónde sale y a dónde entra");return}if(d===a){toast("Elige dos cuentas distintas");return}
+      const r=await sb.from("fin_traspasos").insert({de:d,a,monto:v,fecha:s.querySelector("#tf").value||hoy()}).select().single();if(r.error){toast("No se guardó: "+r.error.message);return}
+      S.traspasos.unshift(r.data);closeSheet();render();toast("Listo")};
   });
 }
 /* Tarjeta de crédito Nu: escribes lo que ves en la app de Nu (disponible y deuda) y desde ahí la app sigue sola */
@@ -581,11 +601,13 @@ function sheetTarjeta(){
 function sheetPagoTarjeta(){
   const dj=Math.round(deudaTarjeta());
   sheet(`<h3>Pagar la tarjeta</h3><div class="m">Debes ${fm(dj)}. Escribe cuánto pagaste y de dónde salió.</div><input class="inp big" id="pt" inputmode="decimal" placeholder="$0" value="${dj||""}">
-  <div><div class="mini" style="margin-bottom:6px">¿De dónde salió?</div><div class="chips" id="po"><button type="button" class="cc on" data-o="sueldo">Cajita ${esc(sueldoNom())}</button><button type="button" class="cc" data-o="Efectivo">Efectivo</button><button type="button" class="cc" data-o="Otra cuenta">Otra cuenta</button></div></div>
+  <div><div class="mini" style="margin-bottom:6px">¿De qué plata salió?</div><div class="chips" id="po"><button type="button" class="cc on" data-o="sueldo">Cajita ${esc(sueldoNom())}</button><button type="button" class="cc" data-o="Blu">Blu</button><button type="button" class="cc" data-o="Otra">Otra</button></div></div>
+  <div><div class="mini" style="margin-bottom:6px">¿Con qué cuenta pagaste?</div><div class="chips" id="pd">${MEDIOS.map(x=>`<button type="button" class="cc" data-d="${x[0]}">${x[0]}</button>`).join("")}</div></div>
   <label>Fecha<input class="inp" id="pf" type="date" value="${hoy()}"></label><button class="btn" id="ptv">Guardar pago</button>`,s=>{
-    let org="sueldo";s.querySelectorAll("#po .cc").forEach(b=>b.onclick=()=>{s.querySelectorAll("#po .cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");org=b.dataset.o});
+    let org="sueldo",med=null;s.querySelectorAll("#po .cc").forEach(b=>b.onclick=()=>{s.querySelectorAll("#po .cc").forEach(x=>x.classList.remove("on"));b.classList.add("on");org=b.dataset.o});
+    s.querySelectorAll("#pd .cc").forEach(b=>b.onclick=()=>{const was=b.classList.contains("on");s.querySelectorAll("#pd .cc").forEach(x=>x.classList.remove("on"));if(!was){b.classList.add("on");med=b.dataset.d}else med=null});
     s.querySelector("#ptv").onclick=async()=>{const v=num(s.querySelector("#pt").value);if(!(v>0)){toast("Escribe el monto");return}
-      const r=await sb.from("fin_tarjeta_pagos").insert({monto:v,fecha:s.querySelector("#pf").value||hoy(),origen:org}).select().single();if(r.error){toast("No se guardó: "+r.error.message);return}
+      const r=await sb.from("fin_tarjeta_pagos").insert({monto:v,fecha:s.querySelector("#pf").value||hoy(),origen:org,medio:med}).select().single();if(r.error){toast("No se guardó: "+r.error.message);return}
       S.tpagos.unshift(r.data);closeSheet();render();toast("Pago guardado")};
   });
 }
@@ -736,7 +758,9 @@ document.addEventListener("click",async e=>{
   else if(a==="ajustesaldo")sheetAjusteSaldo();
   else if(a==="ajustesaldoblu")sheetAjusteBlu();
   else if(a==="newcj")sheetCaja(v||null);
-  else if(a==="ajustesef")sheetAjusteEf();
+  else if(a==="ajustecuenta")sheetAjusteCuenta(v);
+  else if(a==="traspaso")sheetTraspaso(v||null);
+  else if(a==="deltr"){if(!confirm("¿Borrar este traspaso?"))return;const r=await sb.from("fin_traspasos").delete().eq("id",v);if(r.error){toast("No se pudo borrar");return}S.traspasos=S.traspasos.filter(x=>x.id!==v);render();toast("Borrado")}
   else if(a==="cfgtarjeta")sheetTarjeta();
   else if(a==="pagotarjeta")sheetPagoTarjeta();
   else if(a==="deltp"){if(!confirm("¿Borrar este pago?"))return;const r=await sb.from("fin_tarjeta_pagos").delete().eq("id",v);if(r.error){toast("No se pudo borrar");return}S.tpagos=S.tpagos.filter(x=>x.id!==v);render();toast("Borrado")}
