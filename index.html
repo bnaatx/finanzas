@@ -215,8 +215,8 @@ function saldoSueldo(){
 }
 /* Efectivo y tarjeta de crédito Nu (Abre Caminos). Los medios se comparan sin importar mayúsculas */
 /* Medios de pago: con qué se pagó (Nequi, DaviPlata, Bancolombia, Nu, Efectivo, Tarjeta Nu). Es aparte de "de qué plata salió" (origen) */
-const MEDIOS=[["Efectivo","#3E9B6F"],["Nequi","#C8147F"],["DaviPlata","#E5322D"],["Bancolombia","#3B3B40"],["BDB","#00569E"],["Nu","#8A05BE"]];
-const medioDe=m=>{const x=(m.medio||m.origen||"").trim().toLowerCase();return ["efectivo","nequi","daviplata","bancolombia","bdb","nu","tarjeta nu"].includes(x)?x:""};
+const MEDIOS=[["Efectivo","#3E9B6F"],["Nequi","#C8147F"],["DaviPlata","#E5322D"],["Bancolombia","#3B3B40"],["Banco de Bogotá","#00569E"],["Nu","#8A05BE"]];
+const medioDe=m=>{const x=(m.medio||m.origen||"").trim().toLowerCase();return ["efectivo","nequi","daviplata","bancolombia","banco de bogotá","bdb","nu","tarjeta nu"].includes(x)?x:""};
 const esOrg=(m,n)=>medioDe(m)===n;
 /* Mi dinero: cada cuenta tiene un saldo real (lo ajustas tú) y desde ahí suma ingresos, resta gastos y pagos de la tarjeta, y mueve traspasos */
 const cuentaBase=k=>k==="efectivo"?{base:+S.cfg.efectivo_base||0,ts:S.cfg.efectivo_ts}:((S.cfg.cuentas||{})[k]||{base:0,ts:S.cfg.efectivo_ts});
